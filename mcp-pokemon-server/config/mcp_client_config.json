@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "pokemon-server": {
+      "transport": "stdio",
+      "command": "/Users/francobeltran/Code/Projects/mcp-test/.venv/bin/python",
+      "args": ["-m", "src.main"],
+      "cwd": "/Users/francobeltran/Code/Projects/mcp-test/mcp-pokemon-server",
+      "env": {
+        "PYTHONPATH": "/Users/francobeltran/Code/Projects/mcp-test/mcp-pokemon-server"
+      }
+    }
+  }
+}

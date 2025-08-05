@@ -1,14 +1,15 @@
 """Main entry point for MCP Pokemon Server."""
 
-import asyncio
 import sys
 from pathlib import Path
 
-# Add src to Python path for imports
+# Add project root to Python path for imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(Path(__file__).parent))
 
-from server.mcp_server import run_server
-from config.logging import setup_logging, get_logger
+from src.server.mcp_server import run_server
+from src.config.logging import setup_logging, get_logger
 
 # Setup logging first
 setup_logging()
@@ -20,8 +21,8 @@ def main():
     logger.info("Starting MCP Pokemon Server application")
     
     try:
-        # Run the async server
-        asyncio.run(run_server())
+        # Run the server directly (FastMCP handles asyncio internally)
+        run_server()
     except KeyboardInterrupt:
         logger.info("Application stopped by user")
     except Exception as e:

@@ -1,0 +1,71 @@
+{
+  "name": "pokemon-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for Pokemon information using PokéAPI",
+  "capabilities": {
+    "tools": {}
+  },
+  "tools": [
+    {
+      "name": "get_pokemon_info",
+      "description": "Get detailed information about a Pokemon by name or ID",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name_or_id": {
+            "type": "string",
+            "description": "Pokemon name or ID to lookup"
+          }
+        },
+        "required": ["name_or_id"]
+      }
+    },
+    {
+      "name": "search_pokemon",
+      "description": "Search for Pokemon with pagination",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of results (default: 20)",
+            "default": 20
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Offset for pagination (default: 0)",
+            "default": 0
+          }
+        }
+      }
+    },
+    {
+      "name": "get_type_effectiveness",
+      "description": "Get type effectiveness chart for a Pokemon type",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attacking_type": {
+            "type": "string",
+            "description": "The attacking type name (e.g., 'fire', 'water', 'electric')"
+          }
+        },
+        "required": ["attacking_type"]
+      }
+    },
+    {
+      "name": "analyze_pokemon_stats",
+      "description": "Analyze Pokemon stats and provide insights",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name_or_id": {
+            "type": "string",
+            "description": "Pokemon name or ID to analyze"
+          }
+        },
+        "required": ["name_or_id"]
+      }
+    }
+  ]
+}
