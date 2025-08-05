@@ -1,9 +1,10 @@
 {
   "name": "pokemon-mcp-server",
-  "version": "0.1.0",
-  "description": "MCP server for Pokemon information using PokéAPI",
+  "version": "0.2.0",
+  "description": "MCP server for Pokemon information using PokéAPI with dynamic resources",
   "capabilities": {
-    "tools": {}
+    "tools": {},
+    "resources": {}
   },
   "tools": [
     {
@@ -66,6 +67,44 @@
         },
         "required": ["name_or_id"]
       }
+    }
+  ],
+  "resources": [
+    {
+      "uri": "pokemon://info/{name_or_id}",
+      "name": "Pokemon Information",
+      "description": "Detailed information about a specific Pokemon",
+      "mimeType": "text/markdown"
+    },
+    {
+      "uri": "pokemon://stats/{name_or_id}",
+      "name": "Pokemon Statistics",
+      "description": "Detailed statistical analysis of a Pokemon",
+      "mimeType": "text/markdown"
+    },
+    {
+      "uri": "pokemon://moveset/{name_or_id}",
+      "name": "Pokemon Moveset",
+      "description": "Complete moveset and learn methods for a Pokemon",
+      "mimeType": "text/markdown"
+    },
+    {
+      "uri": "pokemon://type/{type_name}",
+      "name": "Type Information",
+      "description": "Type effectiveness chart and Pokemon of this type",
+      "mimeType": "text/markdown"
+    },
+    {
+      "uri": "pokemon://generation/{gen_number}",
+      "name": "Generation Pokemon",
+      "description": "All Pokemon from a specific generation",
+      "mimeType": "text/markdown"
+    },
+    {
+      "uri": "pokemon://comparison/{pokemon1_name}/{pokemon2_name}",
+      "name": "Pokemon Comparison",
+      "description": "Side-by-side comparison of two Pokemon",
+      "mimeType": "text/markdown"
     }
   ]
 }

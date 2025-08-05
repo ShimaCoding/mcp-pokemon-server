@@ -156,6 +156,10 @@ class PokemonAPIClient:
             logger.error("Failed to fetch type info", type_name=type_name, error=str(e))
             raise
     
+    async def get_type_data(self, type_name: str) -> Dict[str, Any]:
+        """Alias for get_type_info for consistency with resource manager."""
+        return await self.get_type_info(type_name)
+    
     async def get_multiple_pokemon(self, identifiers: List[str]) -> List[Pokemon]:
         """Get multiple Pokemon concurrently."""
         logger.info("Fetching multiple Pokemon", count=len(identifiers))
