@@ -24,6 +24,24 @@
 - **Tests unitarios y de integración** funcionando
 - **Configuración para Claude Desktop** lista
 
+#### ✅ Fase 3: Features Avanzadas
+- **✅ Tarea 3.1**: Resources dinámicos implementados
+  - `pokemon://info/{name_or_id}` - Información detallada de Pokemon
+  - `pokemon://stats/{name_or_id}` - Análisis estadístico
+  - `pokemon://type/{type_name}` - Información de tipos
+  - `pokemon://comparison/{pokemon1}/{pokemon2}` - Comparaciones
+- **✅ Tarea 3.2**: Prompts educativos completados
+  - Sistema de prompts dinámicos funcional
+  - Prompts educativos por nivel (beginner/intermediate/advanced)
+  - Prompts de batalla estratégicos
+  - 6 prompts especializados implementados:
+    - `educational/pokemon-analysis` - Análisis educativo de Pokemon
+    - `educational/team-building` - Guía de construcción de equipos
+    - `educational/type-effectiveness` - Aprendizaje de efectividad de tipos
+    - `battle/strategy` - Estrategia de batalla
+    - `battle/matchup-analysis` - Análisis de enfrentamientos
+    - `battle/team-preview` - Análisis de equipos
+
 ## 🏗️ Arquitectura Final
 
 ```

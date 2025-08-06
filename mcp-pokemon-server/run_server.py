@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Simple runner for MCP Pokemon Server"""
 
-import subprocess
 import sys
 import os
 from pathlib import Path
@@ -9,27 +8,22 @@ from pathlib import Path
 def main():
     # Get project paths
     project_root = Path(__file__).parent
-    venv_python = "/Users/francobeltran/Code/Projects/mcp-test/.venv/bin/python"
+    
+    # Add project root to Python path
+    sys.path.insert(0, str(project_root))
     
     # Set environment
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(project_root)
+    os.environ["PYTHONPATH"] = str(project_root)
     
-    print("🎮 Starting MCP Pokemon Server...")
-    print(f"📁 Project root: {project_root}")
-    print(f"🐍 Python: {venv_python}")
+    # Import and run the server directly
+    from src.main import main as server_main
     
     try:
-        # Run the server
-        cmd = [venv_python, "-m", "src.main"]
-        subprocess.run(cmd, cwd=project_root, env=env, check=True)
+        server_main()
     except KeyboardInterrupt:
-        print("\n🛑 Server stopped by user")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Error running server: {e}")
-        sys.exit(1)
+        print("🛑 Server stopped by user", file=sys.stderr)
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f"❌ Unexpected error: {e}", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":

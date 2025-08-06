@@ -32,6 +32,12 @@ class PokemonSprites(BaseModel):
     back_shiny: Optional[HttpUrl] = None
 
 
+class PokemonMove(BaseModel):
+    """Pokemon move information."""
+    move: Dict[str, str]  # name and url
+    version_group_details: List[Dict[str, Any]]
+
+
 class Pokemon(BaseModel):
     """Complete Pokemon model."""
     id: int
@@ -43,6 +49,7 @@ class Pokemon(BaseModel):
     stats: List[PokemonStat]
     abilities: List[PokemonAbility]
     sprites: PokemonSprites
+    moves: Optional[List[PokemonMove]] = None
     
     @property
     def height_meters(self) -> float:
@@ -74,6 +81,7 @@ class PokemonSpecies(BaseModel):
     habitat: Optional[Dict[str, str]] = None
     is_legendary: bool
     is_mythical: bool
+    flavor_text_entries: Optional[List[Dict[str, Any]]] = None
 
 
 class TypeEffectiveness(BaseModel):
