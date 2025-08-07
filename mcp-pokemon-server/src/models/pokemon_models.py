@@ -100,7 +100,7 @@ class PokemonSearchResult(BaseModel):
 class PokemonTeam(BaseModel):
     """A team of Pokemon."""
     name: str
-    pokemon: List[Pokemon] = Field(max_items=6)
+    pokemon: List[Pokemon] = Field(max_length=6)
     description: Optional[str] = None
     
     @property

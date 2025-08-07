@@ -3,7 +3,7 @@
 import os
 from typing import Optional
 
-from pydantic import Field
+from pydantic import Field, ConfigDict
 from pydantic_settings import BaseSettings
 
 
@@ -55,11 +55,11 @@ class Settings(BaseSettings):
     allowed_origins: str = Field(default="*", alias="ALLOWED_ORIGINS")
     api_key_header: str = Field(default="X-API-Key", alias="API_KEY_HEADER")
     
-    class Config:
-        """Pydantic configuration."""
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False
+    )
 
 
 # Global settings instance
