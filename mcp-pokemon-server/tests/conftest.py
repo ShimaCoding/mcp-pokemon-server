@@ -1,7 +1,7 @@
 """Pytest configuration and fixtures for MCP Pokemon Server tests."""
 
 import asyncio
-from typing import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
@@ -63,80 +63,68 @@ def sample_pokemon_data() -> dict:
                 "slot": 1,
                 "type": {
                     "name": "electric",
-                    "url": "https://pokeapi.co/api/v2/type/13/"
-                }
+                    "url": "https://pokeapi.co/api/v2/type/13/",
+                },
             }
         ],
         "stats": [
             {
                 "base_stat": 35,
                 "effort": 0,
-                "stat": {
-                    "name": "hp",
-                    "url": "https://pokeapi.co/api/v2/stat/1/"
-                }
+                "stat": {"name": "hp", "url": "https://pokeapi.co/api/v2/stat/1/"},
             },
             {
                 "base_stat": 55,
                 "effort": 0,
-                "stat": {
-                    "name": "attack",
-                    "url": "https://pokeapi.co/api/v2/stat/2/"
-                }
+                "stat": {"name": "attack", "url": "https://pokeapi.co/api/v2/stat/2/"},
             },
             {
                 "base_stat": 40,
                 "effort": 0,
-                "stat": {
-                    "name": "defense",
-                    "url": "https://pokeapi.co/api/v2/stat/3/"
-                }
+                "stat": {"name": "defense", "url": "https://pokeapi.co/api/v2/stat/3/"},
             },
             {
                 "base_stat": 50,
                 "effort": 0,
                 "stat": {
                     "name": "special-attack",
-                    "url": "https://pokeapi.co/api/v2/stat/4/"
-                }
+                    "url": "https://pokeapi.co/api/v2/stat/4/",
+                },
             },
             {
                 "base_stat": 50,
                 "effort": 0,
                 "stat": {
                     "name": "special-defense",
-                    "url": "https://pokeapi.co/api/v2/stat/5/"
-                }
+                    "url": "https://pokeapi.co/api/v2/stat/5/",
+                },
             },
             {
                 "base_stat": 90,
                 "effort": 2,
-                "stat": {
-                    "name": "speed",
-                    "url": "https://pokeapi.co/api/v2/stat/6/"
-                }
-            }
+                "stat": {"name": "speed", "url": "https://pokeapi.co/api/v2/stat/6/"},
+            },
         ],
         "abilities": [
             {
                 "ability": {
                     "name": "static",
-                    "url": "https://pokeapi.co/api/v2/ability/9/"
+                    "url": "https://pokeapi.co/api/v2/ability/9/",
                 },
                 "is_hidden": False,
-                "slot": 1
+                "slot": 1,
             },
             {
                 "ability": {
                     "name": "lightning-rod",
-                    "url": "https://pokeapi.co/api/v2/ability/31/"
+                    "url": "https://pokeapi.co/api/v2/ability/31/",
                 },
                 "is_hidden": True,
-                "slot": 3
-            }
+                "slot": 3,
+            },
         ],
         "sprites": {
             "front_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png",
-            "front_shiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/25.png"
-        }
+            "front_shiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/25.png",
+        },
     }

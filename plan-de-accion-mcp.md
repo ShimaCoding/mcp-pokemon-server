@@ -541,7 +541,7 @@ class Settings(BaseSettings):
     pokeapi_base_url: str = "https://pokeapi.co/api/v2"
     redis_url: str = "redis://localhost:6379"
     log_level: str = "INFO"
-    
+
     class Config:
         env_file = ".env"
 ```

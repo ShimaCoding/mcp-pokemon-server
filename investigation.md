@@ -86,12 +86,12 @@ async def fetch_pokemon_data(pokemon_id: int) -> dict:
     try:
         if pokemon_id < 1 or pokemon_id > 1010:
             raise ValueError("Pokémon ID must be between 1 and 1010")
-        
+
         async with httpx.AsyncClient() as client:
             response = await client.get(f"https://pokeapi.co/api/v2/pokemon/{pokemon_id}")
             response.raise_for_status()
             return response.json()
-            
+
     except httpx.HTTPError as e:
         raise ToolError(f"API request failed: {str(e)}")
     except ValueError as e:
@@ -144,7 +144,7 @@ from mcp.server.fastmcp import Context
 async def analyze_pokemon_team(team_names: list[str], ctx: Context) -> dict:
     """Analyze a team of Pokémon with progress updates"""
     await ctx.info(f"Analyzing team of {len(team_names)} Pokémon")
-    
+
     results = []
     for i, name in enumerate(team_names):
         progress = (i + 1) / len(team_names)
@@ -153,11 +153,11 @@ async def analyze_pokemon_team(team_names: list[str], ctx: Context) -> dict:
             total=1.0,
             message=f"Analyzing {name} ({i+1}/{len(team_names)})"
         )
-        
+
         pokemon_data = await fetch_pokemon_analysis(name)
         results.append(pokemon_data)
         await ctx.debug(f"Completed analysis for {name}")
-    
+
     return {"team_analysis": results, "total_analyzed": len(results)}
 ```
 
@@ -172,8 +172,8 @@ Basic prompt implementation follows the decorator pattern with parameter support
 ```python
 @mcp.prompt()
 def pokemon_battle_analysis(
-    pokemon1: str, 
-    pokemon2: str, 
+    pokemon1: str,
+    pokemon2: str,
     battle_format: str = "singles"
 ) -> str:
     """Generate a prompt for Pokémon battle analysis"""
@@ -210,23 +210,23 @@ Format your response with clear reasoning for each choice."""
 @mcp.prompt()
 def adaptive_pokemon_guide(difficulty_level: str, focus_area: str) -> str:
     """Generate adaptive learning content based on user level"""
-    
+
     difficulty_prompts = {
         "beginner": "Explain in simple terms suitable for newcomers",
-        "intermediate": "Include strategic considerations and calculations", 
+        "intermediate": "Include strategic considerations and calculations",
         "advanced": "Provide detailed competitive analysis with meta considerations"
     }
-    
+
     focus_prompts = {
         "types": "Focus on type effectiveness and STAB (Same Type Attack Bonus)",
         "stats": "Emphasize base stats, EVs, IVs, and stat calculations",
         "moves": "Concentrate on movesets, coverage, and move selection",
         "abilities": "Highlight ability interactions and strategic uses"
     }
-    
+
     base_instruction = difficulty_prompts.get(difficulty_level, difficulty_prompts["beginner"])
     focus_instruction = focus_prompts.get(focus_area, "general gameplay concepts")
-    
+
     return f"""Create educational content about Pokémon {focus_area}.
 
 Instruction level: {base_instruction}
@@ -296,27 +296,27 @@ class PokemonResourceCache:
         self.memory_cache = {}
         self.redis_client = redis.Redis(decode_responses=True)
         self.cache_ttl = 3600  # 1 hour
-    
+
     @lru_cache(maxsize=500)
     def get_cached_pokemon(self, pokemon_id: int) -> dict:
         """L1 memory cache for frequently accessed Pokémon"""
         return self._fetch_pokemon_data(pokemon_id)
-    
+
     async def get_pokemon_with_distributed_cache(self, pokemon_id: int) -> dict:
         """Multi-level caching strategy"""
         cache_key = f"pokemon:{pokemon_id}"
-        
+
         # L1: Check memory cache
         if cache_key in self.memory_cache:
             return self.memory_cache[cache_key]
-        
+
         # L2: Check Redis cache
         cached_data = self.redis_client.get(cache_key)
         if cached_data:
             data = json.loads(cached_data)
             self.memory_cache[cache_key] = data
             return data
-        
+
         # L3: Fetch from API and cache
         data = await self._fetch_from_api(pokemon_id)
         self.redis_client.setex(cache_key, self.cache_ttl, json.dumps(data))
@@ -337,17 +337,17 @@ def secure_file_access(filename: str) -> str:
     # Prevent path traversal attacks
     safe_path = Path(filename).resolve()
     allowed_base = Path("/app/pokemon-data").resolve()
-    
+
     if not str(safe_path).startswith(str(allowed_base)):
         raise SecurityError("Path traversal detected")
-    
+
     if not safe_path.exists():
         raise FileNotFoundError(f"File {filename} not found")
-    
+
     # Additional validation
     if safe_path.suffix not in ['.json', '.csv', '.txt']:
         raise ValueError("Unsupported file type")
-    
+
     return safe_path.read_text()
 
 @mcp.resource("database://pokemon/{pokemon_id}")
@@ -360,7 +360,7 @@ def secure_database_access(pokemon_id: str) -> str:
             raise ValueError("Invalid Pokémon ID range")
     except ValueError:
         raise ValueError("Pokémon ID must be a valid integer")
-    
+
     # Use parameterized queries to prevent SQL injection
     query = "SELECT * FROM pokemon WHERE id = ?"
     result = execute_safe_query(query, (pokemon_id_int,))
@@ -381,7 +381,7 @@ from mcp.server.fastmcp import Context
 @mcp.tool()
 async def interactive_pokemon_team_builder(ctx: Context) -> dict:
     """Build a Pokémon team through interactive elicitation"""
-    
+
     # Step 1: Get preferred playstyle
     playstyle_result = await ctx.request_user_input(
         message="What's your preferred playstyle?",
@@ -397,19 +397,19 @@ async def interactive_pokemon_team_builder(ctx: Context) -> dict:
             "required": ["style"]
         }
     )
-    
+
     if playstyle_result.action == "cancel":
         return {"message": "Team building cancelled"}
-    
+
     playstyle = playstyle_result.data["style"]
-    
+
     # Step 2: Get favorite types (conditional on playstyle)
     type_options = get_recommended_types(playstyle)
-    
+
     type_result = await ctx.request_user_input(
         message=f"Select 2-3 favorite types for your {playstyle} team:",
         schema={
-            "type": "object", 
+            "type": "object",
             "properties": {
                 "types": {
                     "type": "array",
@@ -422,17 +422,17 @@ async def interactive_pokemon_team_builder(ctx: Context) -> dict:
             "required": ["types"]
         }
     )
-    
+
     if type_result.action == "decline":
         # Graceful degradation with default types
         selected_types = get_default_types(playstyle)
         await ctx.info(f"Using default types for {playstyle}: {selected_types}")
     else:
         selected_types = type_result.data["types"]
-    
+
     # Build team based on gathered information
     team = await build_optimized_team(playstyle, selected_types)
-    
+
     return {
         "team": team,
         "playstyle": playstyle,
@@ -449,7 +449,7 @@ async def interactive_pokemon_team_builder(ctx: Context) -> dict:
 @mcp.tool()
 async def adaptive_pokemon_lesson(topic: str, ctx: Context) -> dict:
     """Provide adaptive learning based on user knowledge level"""
-    
+
     # Assess current knowledge
     assessment_result = await ctx.request_user_input(
         message=f"How familiar are you with {topic}?",
@@ -470,7 +470,7 @@ async def adaptive_pokemon_lesson(topic: str, ctx: Context) -> dict:
             "required": ["knowledge_level"]
         }
     )
-    
+
     if assessment_result.action == "cancel":
         # Default to beginner level
         knowledge_level = "beginner"
@@ -478,10 +478,10 @@ async def adaptive_pokemon_lesson(topic: str, ctx: Context) -> dict:
     else:
         knowledge_level = assessment_result.data["knowledge_level"]
         interests = assessment_result.data.get("specific_interests", [])
-    
+
     # Generate appropriate content
     lesson_content = generate_adaptive_content(topic, knowledge_level, interests)
-    
+
     # Offer practice exercises for interactive learners
     if knowledge_level in ["intermediate", "advanced"]:
         practice_result = await ctx.request_user_input(
@@ -503,13 +503,13 @@ async def adaptive_pokemon_lesson(topic: str, ctx: Context) -> dict:
                 "required": ["wants_practice"]
             }
         )
-        
-        if (practice_result.action == "accept" and 
+
+        if (practice_result.action == "accept" and
             practice_result.data["wants_practice"]):
             exercise_count = practice_result.data.get("exercise_count", 3)
             practice_exercises = generate_practice_exercises(topic, exercise_count)
             lesson_content["practice"] = practice_exercises
-    
+
     return lesson_content
 ```
 
@@ -532,25 +532,25 @@ class PokemonAPIClient:
             timeout=httpx.Timeout(30.0),
             limits=httpx.Limits(max_keepalive_connections=20)
         )
-    
+
     async def get_pokemon(self, identifier: str) -> dict:
         """Fetch individual Pokémon data"""
         response = await self.client.get(f"{self.base_url}/pokemon/{identifier}")
         response.raise_for_status()
         return response.json()
-    
+
     async def get_pokemon_species(self, identifier: str) -> dict:
         """Fetch Pokémon species information (evolution, habitat, etc.)"""
         response = await self.client.get(f"{self.base_url}/pokemon-species/{identifier}")
         response.raise_for_status()
         return response.json()
-    
+
     async def get_evolution_chain(self, chain_id: int) -> dict:
         """Fetch complete evolution chain"""
         response = await self.client.get(f"{self.base_url}/evolution-chain/{chain_id}")
         response.raise_for_status()
         return response.json()
-    
+
     async def get_paginated_list(self, endpoint: str, limit: int = 20, offset: int = 0) -> dict:
         """Generic paginated list fetcher"""
         params = {"limit": limit, "offset": offset}
@@ -572,7 +572,7 @@ class ResilientPokemonAPI:
     def __init__(self):
         self.client = httpx.AsyncClient()
         self.circuit_breaker = CircuitBreaker(fail_max=5, reset_timeout=60)
-    
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10)
@@ -592,7 +592,7 @@ class ResilientPokemonAPI:
                 raise APIError(f"PokéAPI server error: {e.response.status_code}")
             else:
                 raise APIError(f"API request failed: {e}")
-    
+
     @circuit_breaker
     async def safe_pokemon_fetch(self, pokemon_id: int) -> Optional[dict]:
         """Fetch with circuit breaker protection"""
@@ -625,18 +625,18 @@ class PokemonEducationalFormatter:
             "type_effectiveness": self.calculate_type_matchups(raw_data["types"]),
             "evolution_context": self.get_evolution_stage(raw_data["species"]["url"])
         }
-    
+
     def format_stats(self, stats: list) -> dict:
         """Format stats for educational clarity"""
         stat_names = {
             "hp": "Hit Points",
-            "attack": "Physical Attack", 
+            "attack": "Physical Attack",
             "defense": "Physical Defense",
             "special-attack": "Special Attack",
             "special-defense": "Special Defense",
             "speed": "Speed"
         }
-        
+
         formatted = {}
         total = 0
         for stat in stats:
@@ -649,30 +649,30 @@ class PokemonEducationalFormatter:
                 "percentile": self.calculate_percentile(name, value)
             }
             total += value
-        
+
         formatted["total"] = total
         formatted["average"] = round(total / len(stats), 1)
         return formatted
-    
+
     def generate_learning_notes(self, pokemon_data: dict) -> list[str]:
         """Generate educational insights about the Pokémon"""
         notes = []
-        
+
         # Type-based insights
         types = [t["type"]["name"] for t in pokemon_data["types"]]
         if len(types) == 2:
             notes.append(f"Dual-type Pokémon with {types[0]}/{types[1]} typing provides diverse move coverage")
-        
+
         # Stat distribution insights
         stats = {s["stat"]["name"]: s["base_stat"] for s in pokemon_data["stats"]}
         highest_stat = max(stats, key=stats.get)
         notes.append(f"Excels in {highest_stat} ({stats[highest_stat]}) - suggests {self.suggest_role(highest_stat)} role")
-        
+
         # Ability insights
         abilities = pokemon_data["abilities"]
         if any(a["is_hidden"] for a in abilities):
             notes.append("Has a rare hidden ability - check competitive viability")
-        
+
         return notes
 ```
 
@@ -694,18 +694,18 @@ class ProductionTokenVerifier(TokenVerifier):
         try:
             # Decode and validate JWT
             decoded = jwt.decode(
-                token, 
-                VERIFICATION_KEY, 
+                token,
+                VERIFICATION_KEY,
                 algorithms=["RS256"],
                 audience="mcp-pokemon-api"
             )
-            
+
             # Check required scopes
             required_scopes = ["pokemon:read", "pokemon:analyze"]
             token_scopes = decoded.get("scope", "").split()
             if not all(scope in token_scopes for scope in required_scopes):
                 return None
-            
+
             return AccessToken(
                 access_token=token,
                 scopes=token_scopes,
@@ -745,20 +745,20 @@ class ProductionPokemonMCP:
             "avg_response_time": 0.0
         }
         self.start_time = time.time()
-    
+
     @asynccontextmanager
     async def request_tracking(self, operation: str):
         """Track request metrics and performance"""
         start_time = time.time()
         self.metrics["requests_total"] += 1
-        
+
         try:
             yield
-            logger.info("Operation completed", operation=operation, 
+            logger.info("Operation completed", operation=operation,
                        duration=time.time() - start_time)
         except Exception as e:
             self.metrics["errors_total"] += 1
-            logger.error("Operation failed", operation=operation, 
+            logger.error("Operation failed", operation=operation,
                         error=str(e), duration=time.time() - start_time)
             raise
         finally:
@@ -766,7 +766,7 @@ class ProductionPokemonMCP:
             self.metrics["avg_response_time"] = (
                 self.metrics["avg_response_time"] + duration
             ) / 2
-    
+
     @mcp.tool()
     async def monitored_pokemon_analysis(self, pokemon_name: str) -> dict:
         """Pokemon analysis with full monitoring"""
@@ -776,16 +776,16 @@ class ProductionPokemonMCP:
             if cached_result:
                 self.metrics["cache_hits"] += 1
                 return cached_result
-            
+
             # Fetch and analyze
             self.metrics["pokemon_fetches"] += 1
             pokemon_data = await self.fetch_pokemon(pokemon_name)
             analysis = await self.analyze_pokemon(pokemon_data)
-            
+
             # Cache result
             await self.cache.set(f"analysis:{pokemon_name}", analysis, ttl=3600)
             return analysis
-    
+
     @mcp.tool()
     async def health_check(self) -> dict:
         """Comprehensive health check endpoint"""

@@ -1,24 +1,14 @@
 """MCP server implementation using FastMCP."""
 
-from typing import Any, Sequence, List, Optional
-
 from mcp.server.fastmcp import FastMCP
-from mcp.types import (
-    Tool,
-    TextContent,
-    Resource,
-    TextResourceContents,
-    PromptMessage,
-    GetPromptResult,
-)
+from mcp.types import GetPromptResult, PromptMessage, TextContent
 
-from ..config.settings import get_settings
-from ..config.logging import setup_logging, get_logger
-from ..tools.pokemon_tools import POKEMON_TOOLS
-from ..resources.pokemon_resources import PokemonResourceManager
 from ..clients.pokeapi_client import PokemonAPIClient
-from ..prompts.educational_prompts import EducationalPromptManager
+from ..config.logging import get_logger, setup_logging
 from ..prompts.battle_prompts import BattlePromptManager
+from ..prompts.educational_prompts import EducationalPromptManager
+from ..resources.pokemon_resources import PokemonResourceManager
+from ..tools.pokemon_tools import POKEMON_TOOLS
 
 # Setup logging
 setup_logging()
@@ -37,12 +27,12 @@ battle_prompts = BattlePromptManager(pokemon_client)
 @app.tool()
 async def get_pokemon_info(name_or_id: str) -> str:
     """Get detailed information about a Pokemon by name or ID.
-    
+
     Args:
         name_or_id: Pokemon name or ID to lookup
     """
     logger.info("get_pokemon_info called", identifier=name_or_id)
-    
+
     try:
         result = await POKEMON_TOOLS["get_pokemon_info"](name_or_id)
         if result.is_error:
@@ -57,13 +47,13 @@ async def get_pokemon_info(name_or_id: str) -> str:
 @app.tool()
 async def search_pokemon(limit: int = 20, offset: int = 0) -> str:
     """Search for Pokemon with pagination.
-    
+
     Args:
         limit: Maximum number of results (default: 20)
         offset: Offset for pagination (default: 0)
     """
     logger.info("search_pokemon called", limit=limit, offset=offset)
-    
+
     try:
         result = await POKEMON_TOOLS["search_pokemon"](limit=limit, offset=offset)
         if result.is_error:
@@ -78,12 +68,12 @@ async def search_pokemon(limit: int = 20, offset: int = 0) -> str:
 @app.tool()
 async def get_type_effectiveness(attacking_type: str) -> str:
     """Get type effectiveness chart for a Pokemon type.
-    
+
     Args:
         attacking_type: The attacking type name (e.g., 'fire', 'water', 'electric')
     """
     logger.info("get_type_effectiveness called", attacking_type=attacking_type)
-    
+
     try:
         result = await POKEMON_TOOLS["get_type_effectiveness"](attacking_type)
         if result.is_error:
@@ -98,12 +88,12 @@ async def get_type_effectiveness(attacking_type: str) -> str:
 @app.tool()
 async def analyze_pokemon_stats(name_or_id: str) -> str:
     """Analyze Pokemon stats and provide insights.
-    
+
     Args:
         name_or_id: Pokemon name or ID to analyze
     """
     logger.info("analyze_pokemon_stats called", identifier=name_or_id)
-    
+
     try:
         result = await POKEMON_TOOLS["analyze_pokemon_stats"](name_or_id)
         if result.is_error:
@@ -119,12 +109,12 @@ async def analyze_pokemon_stats(name_or_id: str) -> str:
 @app.resource("pokemon://info/{name_or_id}")
 async def pokemon_info_resource(name_or_id: str) -> str:
     """Get detailed Pokemon information as a resource.
-    
+
     Args:
         name_or_id: Pokemon name or ID to lookup
     """
     logger.info("pokemon_info_resource called", identifier=name_or_id)
-    
+
     try:
         content = await resource_manager.get_resource(f"pokemon://info/{name_or_id}")
         return content.text
@@ -137,12 +127,12 @@ async def pokemon_info_resource(name_or_id: str) -> str:
 @app.resource("pokemon://stats/{name_or_id}")
 async def pokemon_stats_resource(name_or_id: str) -> str:
     """Get Pokemon statistics analysis as a resource.
-    
+
     Args:
         name_or_id: Pokemon name or ID to analyze
     """
     logger.info("pokemon_stats_resource called", identifier=name_or_id)
-    
+
     try:
         content = await resource_manager.get_resource(f"pokemon://stats/{name_or_id}")
         return content.text
@@ -155,12 +145,12 @@ async def pokemon_stats_resource(name_or_id: str) -> str:
 @app.resource("pokemon://type/{type_name}")
 async def pokemon_type_resource(type_name: str) -> str:
     """Get type effectiveness information as a resource.
-    
+
     Args:
         type_name: Pokemon type name (e.g., 'fire', 'water', 'electric')
     """
     logger.info("pokemon_type_resource called", type_name=type_name)
-    
+
     try:
         content = await resource_manager.get_resource(f"pokemon://type/{type_name}")
         return content.text
@@ -173,15 +163,19 @@ async def pokemon_type_resource(type_name: str) -> str:
 @app.resource("pokemon://comparison/{pokemon1}/{pokemon2}")
 async def pokemon_comparison_resource(pokemon1: str, pokemon2: str) -> str:
     """Get Pokemon comparison as a resource.
-    
+
     Args:
         pokemon1: First Pokemon name
         pokemon2: Second Pokemon name
     """
-    logger.info("pokemon_comparison_resource called", pokemon1=pokemon1, pokemon2=pokemon2)
-    
+    logger.info(
+        "pokemon_comparison_resource called", pokemon1=pokemon1, pokemon2=pokemon2
+    )
+
     try:
-        content = await resource_manager.get_resource(f"pokemon://comparison/{pokemon1}/{pokemon2}")
+        content = await resource_manager.get_resource(
+            f"pokemon://comparison/{pokemon1}/{pokemon2}"
+        )
         return content.text
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
@@ -192,22 +186,22 @@ async def pokemon_comparison_resource(pokemon1: str, pokemon2: str) -> str:
 # Prompt handlers - Educational Prompts
 @app.prompt("educational/pokemon-analysis")
 async def pokemon_analysis_prompt(
-    pokemon_name: str,
-    analysis_type: str = "general",
-    user_level: str = "beginner"
+    pokemon_name: str, analysis_type: str = "general", user_level: str = "beginner"
 ) -> GetPromptResult:
     """Educational prompt for Pokemon analysis.
-    
+
     Args:
         pokemon_name: Name of the Pokemon to analyze
         analysis_type: Type of analysis (general, battle, competitive)
         user_level: User experience level (beginner, intermediate, advanced)
     """
-    logger.info("pokemon_analysis_prompt called", 
-               pokemon_name=pokemon_name, 
-               analysis_type=analysis_type, 
-               user_level=user_level)
-    
+    logger.info(
+        "pokemon_analysis_prompt called",
+        pokemon_name=pokemon_name,
+        analysis_type=analysis_type,
+        user_level=user_level,
+    )
+
     try:
         result = await educational_prompts.create_pokemon_analysis_prompt(
             pokemon_name, analysis_type, user_level
@@ -220,12 +214,9 @@ async def pokemon_analysis_prompt(
             messages=[
                 PromptMessage(
                     role="user",
-                    content=TextContent(
-                        type="text",
-                        text=f"❌ Error: {str(e)}"
-                    )
+                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
                 )
-            ]
+            ],
         )
 
 
@@ -233,20 +224,22 @@ async def pokemon_analysis_prompt(
 async def team_building_prompt(
     theme: str = "balanced",
     format: str = "casual",
-    restrictions: Optional[List[str]] = None
+    restrictions: list[str] | None = None,
 ) -> GetPromptResult:
     """Educational prompt for team building guidance.
-    
+
     Args:
         theme: Team theme (balanced, offensive, defensive, type-specific)
         format: Battle format (casual, competitive, tournament)
         restrictions: Optional restrictions (no legendaries, specific generation, etc.)
     """
-    logger.info("team_building_prompt called", 
-               theme=theme, 
-               format=format, 
-               restrictions=restrictions)
-    
+    logger.info(
+        "team_building_prompt called",
+        theme=theme,
+        format=format,
+        restrictions=restrictions,
+    )
+
     try:
         result = await educational_prompts.create_team_building_prompt(
             theme, format, restrictions
@@ -259,33 +252,32 @@ async def team_building_prompt(
             messages=[
                 PromptMessage(
                     role="user",
-                    content=TextContent(
-                        type="text",
-                        text=f"❌ Error: {str(e)}"
-                    )
+                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
                 )
-            ]
+            ],
         )
 
 
 @app.prompt("educational/type-effectiveness")
 async def type_effectiveness_prompt(
     scenario: str = "learning",
-    attacking_type: Optional[str] = None,
-    defending_types: Optional[List[str]] = None
+    attacking_type: str | None = None,
+    defending_types: list[str] | None = None,
 ) -> GetPromptResult:
     """Educational prompt for type effectiveness learning.
-    
+
     Args:
         scenario: Learning scenario (learning, quiz, battle-analysis)
         attacking_type: Specific attacking type to focus on
         defending_types: Specific defending types to analyze
     """
-    logger.info("type_effectiveness_prompt called", 
-               scenario=scenario, 
-               attacking_type=attacking_type, 
-               defending_types=defending_types)
-    
+    logger.info(
+        "type_effectiveness_prompt called",
+        scenario=scenario,
+        attacking_type=attacking_type,
+        defending_types=defending_types,
+    )
+
     try:
         result = await educational_prompts.create_type_effectiveness_prompt(
             scenario, attacking_type, defending_types
@@ -298,37 +290,36 @@ async def type_effectiveness_prompt(
             messages=[
                 PromptMessage(
                     role="user",
-                    content=TextContent(
-                        type="text",
-                        text=f"❌ Error: {str(e)}"
-                    )
+                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
                 )
-            ]
+            ],
         )
 
 
 # Battle Prompts
 @app.prompt("battle/strategy")
 async def battle_strategy_prompt(
-    user_team: List[str],
-    opponent_team: Optional[List[str]] = None,
+    user_team: list[str],
+    opponent_team: list[str] | None = None,
     battle_format: str = "singles",
-    strategy_focus: str = "balanced"
+    strategy_focus: str = "balanced",
 ) -> GetPromptResult:
     """Battle strategy planning prompt.
-    
+
     Args:
         user_team: List of Pokemon names in user's team
         opponent_team: Optional list of opponent's Pokemon
         battle_format: singles, doubles, or multi
         strategy_focus: offensive, defensive, balanced, or utility
     """
-    logger.info("battle_strategy_prompt called", 
-               user_team=user_team, 
-               opponent_team=opponent_team, 
-               battle_format=battle_format, 
-               strategy_focus=strategy_focus)
-    
+    logger.info(
+        "battle_strategy_prompt called",
+        user_team=user_team,
+        opponent_team=opponent_team,
+        battle_format=battle_format,
+        strategy_focus=strategy_focus,
+    )
+
     try:
         result = await battle_prompts.create_battle_strategy_prompt(
             user_team, opponent_team, battle_format, strategy_focus
@@ -341,36 +332,32 @@ async def battle_strategy_prompt(
             messages=[
                 PromptMessage(
                     role="user",
-                    content=TextContent(
-                        type="text",
-                        text=f"❌ Error: {str(e)}"
-                    )
+                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
                 )
-            ]
+            ],
         )
 
 
 @app.prompt("battle/matchup-analysis")
 async def matchup_analysis_prompt(
-    pokemon1: str,
-    pokemon2: str,
-    scenario: str = "1v1",
-    environment: str = "neutral"
+    pokemon1: str, pokemon2: str, scenario: str = "1v1", environment: str = "neutral"
 ) -> GetPromptResult:
     """Pokemon matchup analysis prompt.
-    
+
     Args:
         pokemon1: First Pokemon name
-        pokemon2: Second Pokemon name  
+        pokemon2: Second Pokemon name
         scenario: 1v1, team-context, or switch-prediction
         environment: neutral, weather, terrain effects
     """
-    logger.info("matchup_analysis_prompt called", 
-               pokemon1=pokemon1, 
-               pokemon2=pokemon2, 
-               scenario=scenario, 
-               environment=environment)
-    
+    logger.info(
+        "matchup_analysis_prompt called",
+        pokemon1=pokemon1,
+        pokemon2=pokemon2,
+        scenario=scenario,
+        environment=environment,
+    )
+
     try:
         result = await battle_prompts.create_matchup_analysis_prompt(
             pokemon1, pokemon2, scenario, environment
@@ -383,33 +370,32 @@ async def matchup_analysis_prompt(
             messages=[
                 PromptMessage(
                     role="user",
-                    content=TextContent(
-                        type="text",
-                        text=f"❌ Error: {str(e)}"
-                    )
+                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
                 )
-            ]
+            ],
         )
 
 
 @app.prompt("battle/team-preview")
 async def team_preview_prompt(
-    team: List[str],
+    team: list[str],
     analysis_depth: str = "standard",
-    focus_areas: Optional[List[str]] = None
+    focus_areas: list[str] | None = None,
 ) -> GetPromptResult:
     """Team preview analysis prompt.
-    
+
     Args:
         team: List of Pokemon names to analyze
         analysis_depth: quick, standard, or comprehensive
         focus_areas: specific areas to focus on (offense, defense, synergy, etc.)
     """
-    logger.info("team_preview_prompt called", 
-               team=team, 
-               analysis_depth=analysis_depth, 
-               focus_areas=focus_areas)
-    
+    logger.info(
+        "team_preview_prompt called",
+        team=team,
+        analysis_depth=analysis_depth,
+        focus_areas=focus_areas,
+    )
+
     try:
         result = await battle_prompts.create_team_preview_prompt(
             team, analysis_depth, focus_areas
@@ -422,37 +408,29 @@ async def team_preview_prompt(
             messages=[
                 PromptMessage(
                     role="user",
-                    content=TextContent(
-                        type="text",
-                        text=f"❌ Error: {str(e)}"
-                    )
+                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
                 )
-            ]
+            ],
         )
 
 
 async def create_server() -> FastMCP:
     """Create and configure the MCP server."""
-    settings = get_settings()
-    
-    logger.info("Creating MCP server", 
-               server_name="Pokemon MCP Server",
-               version="0.1.0")
-    
+    logger.info(
+        "Creating MCP server", server_name="Pokemon MCP Server", version="0.1.0"
+    )
+
     return app
 
 
 def run_server():
     """Run the MCP server."""
-    settings = get_settings()
-    
-    logger.info("Starting Pokemon MCP Server",
-               server_name="Pokemon MCP Server")
-    
+    logger.info("Starting Pokemon MCP Server", server_name="Pokemon MCP Server")
+
     try:
         # FastMCP handles asyncio internally - just run the app
         app.run()
-        
+
     except KeyboardInterrupt:
         logger.info("Server shutdown requested")
     except Exception as e:
@@ -467,7 +445,7 @@ def run_server():
 def cleanup_resources():
     """Cleanup server resources."""
     logger.info("Cleaning up server resources")
-    
+
     try:
         # Simple cleanup without async
         logger.info("Resources cleaned up successfully")

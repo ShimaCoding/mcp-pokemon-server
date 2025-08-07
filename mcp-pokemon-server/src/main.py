@@ -8,8 +8,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(Path(__file__).parent))
 
+from src.config.logging import get_logger, setup_logging
 from src.server.mcp_server import run_server
-from src.config.logging import setup_logging, get_logger
 
 # Setup logging first
 setup_logging()
@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 def main():
     """Main entry point."""
     logger.info("Starting MCP Pokemon Server application")
-    
+
     try:
         # Run the server directly (FastMCP handles asyncio internally)
         run_server()

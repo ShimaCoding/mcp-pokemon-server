@@ -43,6 +43,7 @@ dev = [
     "mypy>=1.5.0",
     "ruff>=0.1.0",
     "pre-commit>=3.0.0",
+    "bandit[toml]>=1.8.0",
 ]
 prod = [
     "prometheus-client>=0.17.0",
@@ -112,6 +113,8 @@ disallow_untyped_defs = false
 [tool.ruff]
 target-version = "py311"
 line-length = 88
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -125,10 +128,13 @@ ignore = [
     "E501",  # line too long, handled by black
     "B008",  # do not perform function calls in argument defaults
     "C901",  # too complex
+    "E402",  # module level import not at top of file (needed for sys.path)
+    "B904",  # raise without from in except (sometimes acceptable)
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+"src/main.py" = ["E402"]  # Allow non-top imports for path setup
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -139,3 +145,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv"]
+skips = ["B101", "B601"]  # Skip assert_used and shell_injection_process_creation
