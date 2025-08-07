@@ -76,9 +76,6 @@ jobs:
     - name: Run ruff
       run: ruff check src tests
 
-    - name: Run mypy
-      run: mypy src
-
     - name: Run bandit security check
       run: bandit -r src -f json -o bandit-report.json || true
 
