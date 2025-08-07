@@ -36,8 +36,8 @@ async def get_pokemon_info(name_or_id: str) -> str:
     try:
         result = await POKEMON_TOOLS["get_pokemon_info"](name_or_id)
         if result.is_error:
-            return result.content[0]["text"]
-        return result.content[0]["text"]
+            return str(result.content[0]["text"])
+        return str(result.content[0]["text"])
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
         logger.error("get_pokemon_info failed", error=str(e))
@@ -57,8 +57,8 @@ async def search_pokemon(limit: int = 20, offset: int = 0) -> str:
     try:
         result = await POKEMON_TOOLS["search_pokemon"](limit=limit, offset=offset)
         if result.is_error:
-            return result.content[0]["text"]
-        return result.content[0]["text"]
+            return str(result.content[0]["text"])
+        return str(result.content[0]["text"])
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
         logger.error("search_pokemon failed", error=str(e))
@@ -77,8 +77,8 @@ async def get_type_effectiveness(attacking_type: str) -> str:
     try:
         result = await POKEMON_TOOLS["get_type_effectiveness"](attacking_type)
         if result.is_error:
-            return result.content[0]["text"]
-        return result.content[0]["text"]
+            return str(result.content[0]["text"])
+        return str(result.content[0]["text"])
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
         logger.error("get_type_effectiveness failed", error=str(e))
@@ -97,8 +97,8 @@ async def analyze_pokemon_stats(name_or_id: str) -> str:
     try:
         result = await POKEMON_TOOLS["analyze_pokemon_stats"](name_or_id)
         if result.is_error:
-            return result.content[0]["text"]
-        return result.content[0]["text"]
+            return str(result.content[0]["text"])
+        return str(result.content[0]["text"])
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
         logger.error("analyze_pokemon_stats failed", error=str(e))
@@ -423,7 +423,7 @@ async def create_server() -> FastMCP:
     return app
 
 
-def run_server():
+def run_server() -> None:
     """Run the MCP server."""
     logger.info("Starting Pokemon MCP Server", server_name="Pokemon MCP Server")
 
@@ -442,7 +442,7 @@ def run_server():
         logger.info("Resources cleaned up successfully")
 
 
-def cleanup_resources():
+def cleanup_resources() -> None:
     """Cleanup server resources."""
     logger.info("Cleaning up server resources")
 

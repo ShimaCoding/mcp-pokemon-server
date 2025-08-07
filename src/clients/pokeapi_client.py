@@ -53,16 +53,16 @@ class PokemonAPIClient:
         self.timeout = timeout or settings.pokeapi_timeout
         self.client: httpx.AsyncClient | None = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "PokemonAPIClient":
         """Async context manager entry."""
         await self.start()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit."""
         await self.close()
 
-    async def start(self):
+    async def start(self) -> None:
         """Start the HTTP client."""
         if self.client is None:
             self.client = httpx.AsyncClient(
@@ -72,7 +72,7 @@ class PokemonAPIClient:
             )
             logger.info("PokéAPI client started", base_url=self.base_url)
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the HTTP client."""
         if self.client:
             await self.client.aclose()
@@ -88,6 +88,9 @@ class PokemonAPIClient:
         """Make HTTP request with retry logic."""
         if not self.client:
             await self.start()
+
+        if not self.client:  # Should not happen after start(), but for type safety
+            raise PokemonAPIError("HTTP client not initialized")
 
         url = urljoin(self.base_url, endpoint)
         logger.debug("Making API request", url=url)
@@ -191,13 +194,13 @@ class PokemonAPIClient:
         tasks = [self.get_pokemon(identifier) for identifier in identifiers]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        pokemon_list = []
+        pokemon_list: list[Pokemon] = []
         errors = []
 
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 errors.append(f"Failed to fetch {identifiers[i]}: {result}")
-            else:
+            elif isinstance(result, Pokemon):
                 pokemon_list.append(result)
 
         if errors:
@@ -226,7 +229,7 @@ async def get_pokemon_client() -> PokemonAPIClient:
     return _client
 
 
-async def close_pokemon_client():
+async def close_pokemon_client() -> None:
     """Close the global Pokemon API client."""
     global _client
     if _client:

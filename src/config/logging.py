@@ -2,10 +2,10 @@
 
 import logging
 import sys
-from typing import Any
+from typing import Any, List, Union
 
 import structlog
-from structlog.types import EventDict
+from structlog.types import EventDict, Processor
 
 from .settings import get_settings
 
@@ -38,7 +38,7 @@ def setup_logging() -> None:
     )
 
     # Configure structlog
-    processors = [
+    processors: List[Processor] = [
         structlog.stdlib.filter_by_level,
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,

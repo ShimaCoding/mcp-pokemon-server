@@ -16,7 +16,7 @@ setup_logging()
 logger = get_logger(__name__)
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     logger.info("Starting MCP Pokemon Server application")
 

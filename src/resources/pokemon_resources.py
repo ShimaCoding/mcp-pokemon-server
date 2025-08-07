@@ -11,9 +11,11 @@ Resources provided:
 - pokemon://generation/{gen_number} - Generation-specific Pokemon list
 """
 
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
 from mcp.types import Resource, TextResourceContents
+from pydantic import AnyUrl
 
 from ..clients.pokeapi_client import PokemonAPIClient
 from ..config.logging import get_logger
@@ -52,37 +54,39 @@ class PokemonResourceManager:
         """
         resources = [
             Resource(
-                uri="pokemon://info/{name_or_id}",
+                uri=cast(AnyUrl, "pokemon://info/{name_or_id}"),
                 name="Pokemon Information",
                 description="Detailed information about a specific Pokemon",
                 mimeType="text/markdown",
             ),
             Resource(
-                uri="pokemon://stats/{name_or_id}",
+                uri=cast(AnyUrl, "pokemon://stats/{name_or_id}"),
                 name="Pokemon Statistics",
                 description="Detailed statistical analysis of a Pokemon",
                 mimeType="text/markdown",
             ),
             Resource(
-                uri="pokemon://moveset/{name_or_id}",
+                uri=cast(AnyUrl, "pokemon://moveset/{name_or_id}"),
                 name="Pokemon Moveset",
                 description="Complete moveset and learn methods for a Pokemon",
                 mimeType="text/markdown",
             ),
             Resource(
-                uri="pokemon://type/{type_name}",
+                uri=cast(AnyUrl, "pokemon://type/{type_name}"),
                 name="Type Information",
                 description="Type effectiveness chart and Pokemon of this type",
                 mimeType="text/markdown",
             ),
             Resource(
-                uri="pokemon://generation/{gen_number}",
+                uri=cast(AnyUrl, "pokemon://generation/{gen_number}"),
                 name="Generation Pokemon",
                 description="All Pokemon from a specific generation",
                 mimeType="text/markdown",
             ),
             Resource(
-                uri="pokemon://comparison/{pokemon1_name}/{pokemon2_name}",
+                uri=cast(
+                    AnyUrl, "pokemon://comparison/{pokemon1_name}/{pokemon2_name}"
+                ),
                 name="Pokemon Comparison",
                 description="Side-by-side comparison of two Pokemon",
                 mimeType="text/markdown",
@@ -142,7 +146,9 @@ class PokemonResourceManager:
                 "Resource fetched successfully", uri=uri, content_length=len(content)
             )
 
-            return TextResourceContents(uri=uri, mimeType="text/markdown", text=content)
+            return TextResourceContents(
+                uri=cast(AnyUrl, uri), mimeType="text/markdown", text=content
+            )
 
         except Exception as e:
             logger.error(
@@ -262,12 +268,15 @@ class PokemonResourceManager:
                 content += f"`{bar}` {percentage:.1f}% of total\n\n"
 
             # Statistical analysis
+            highest_stat_name = max(stats, key=lambda x: stats[x])
+            lowest_stat_name = min(stats, key=lambda x: stats[x])
+
             content += f"""
 ## Statistical Summary
 - **Total Base Stats**: {total_stats}
 - **Average Stat**: {total_stats / 6:.1f}
-- **Highest Stat**: {max(stats.values())} ({max(stats, key=stats.get).replace("-", " ").title()})
-- **Lowest Stat**: {min(stats.values())} ({min(stats, key=stats.get).replace("-", " ").title()})
+- **Highest Stat**: {max(stats.values())} ({highest_stat_name.replace("-", " ").title()})
+- **Lowest Stat**: {min(stats.values())} ({lowest_stat_name.replace("-", " ").title()})
 
 ## Battle Role Analysis
 """
@@ -322,7 +331,7 @@ class PokemonResourceManager:
 """
 
             # Group moves by learn method
-            moves_by_method = {}
+            moves_by_method: dict[str, list[dict[str, Any]]] = {}
             if pokemon_data.moves:
                 for move_entry in pokemon_data.moves:
                     move_name = move_entry.move["name"]

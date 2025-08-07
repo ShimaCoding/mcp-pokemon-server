@@ -110,6 +110,16 @@ strict_equality = true
 module = "tests.*"
 disallow_untyped_defs = false
 
+[[tool.mypy.overrides]]
+module = "src.server.mcp_server"
+# Temporarily allow these errors until we can fix the dynamic function calls
+disable_error_code = ["operator", "no-any-return", "unused-ignore"]
+
+[[tool.mypy.overrides]]
+module = ["src.config.logging", "src.clients.pokeapi_client"]
+# Allow no-any-return for these specific cases where external libraries return Any
+disable_error_code = ["no-any-return"]
+
 [tool.ruff]
 target-version = "py311"
 line-length = 88

@@ -173,7 +173,7 @@ class EducationalPromptManager:
         pokemon_data: Any,  # Pokemon model instance
         analysis_type: str,
         user_level: str,
-    ) -> dict[str, str]:
+    ) -> dict[str, Any]:
         """Build context for Pokemon analysis prompts."""
         # Extract stats as dictionary
         base_stats = {}
@@ -289,7 +289,7 @@ Use full competitive terminology and deep strategic analysis.
 
     def _build_team_building_context(
         self, theme: str, format: str, restrictions: list[str] | None
-    ) -> dict[str, str]:
+    ) -> dict[str, Any]:
         """Build context for team building prompts."""
         system_message = (
             "You are an expert Pokemon team builder and strategist. Help users create "
@@ -358,7 +358,7 @@ Consider type coverage, stat distribution, and strategic balance in your recomme
         scenario: str,
         attacking_type: str | None,
         defending_types: list[str] | None,
-    ) -> dict[str, str]:
+    ) -> dict[str, Any]:
         """Build context for type effectiveness prompts."""
         system_messages = {
             "learning": (
