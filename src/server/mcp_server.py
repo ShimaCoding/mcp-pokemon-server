@@ -8,6 +8,7 @@ from ..config.logging import get_logger, setup_logging
 from ..prompts.battle_prompts import BattlePromptManager
 from ..prompts.educational_prompts import EducationalPromptManager
 from ..resources.pokemon_resources import PokemonResourceManager
+from ..tools.interactive_tools import INTERACTIVE_TOOLS
 from ..tools.pokemon_tools import POKEMON_TOOLS
 
 # Setup logging
@@ -108,6 +109,119 @@ async def analyze_pokemon_stats(name_or_id: str) -> str:
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
         logger.error("analyze_pokemon_stats failed", error=str(e))
+        return error_msg
+
+
+# Interactive elicitation tools
+@app.tool()
+async def get_pokemon_info_interactive(
+    pokemon_name: str | None = None, state: dict | None = None
+) -> str:
+    """Interactive Pokemon information tool with elicitation.
+
+    Asks for Pokemon name if not provided and guides the user through
+    the information retrieval process.
+
+    Args:
+        pokemon_name: Optional Pokemon name from user input
+        state: Conversation state for elicitation flow
+    """
+    logger.info(
+        "get_pokemon_info_interactive called",
+        pokemon_name=pokemon_name,
+        has_state=state is not None,
+    )
+
+    try:
+        result = await INTERACTIVE_TOOLS["get_pokemon_info_elicit"](
+            pokemon_name=pokemon_name, state=state
+        )
+
+        if result.elicit:
+            # Return elicitation prompt to continue conversation
+            return f"ELICIT: {result.elicit['prompt']}"
+        else:
+            # Return final result
+            return str(result.content[0]["text"])
+
+    except Exception as e:
+        error_msg = f"❌ Error: {str(e)}"
+        logger.error("get_pokemon_info_interactive failed", error=str(e))
+        return error_msg
+
+
+@app.tool()
+async def build_pokemon_team_interactive(
+    pokemon_name: str | None = None, state: dict | None = None
+) -> str:
+    """Interactive Pokemon team builder with elicitation.
+
+    Guides the user through building a 3-Pokemon team step by step,
+    validating each Pokemon and providing progress feedback.
+
+    Args:
+        pokemon_name: Pokemon name to add to team
+        state: Conversation state containing team progress
+    """
+    logger.info(
+        "build_pokemon_team_interactive called",
+        pokemon_name=pokemon_name,
+        has_state=state is not None,
+    )
+
+    try:
+        result = await INTERACTIVE_TOOLS["build_pokemon_team_elicit"](
+            pokemon_name=pokemon_name, state=state
+        )
+
+        if result.elicit:
+            # Return elicitation prompt to continue conversation
+            return f"ELICIT: {result.elicit['prompt']}"
+        else:
+            # Return final team analysis
+            return str(result.content[0]["text"])
+
+    except Exception as e:
+        error_msg = f"❌ Error: {str(e)}"
+        logger.error("build_pokemon_team_interactive failed", error=str(e))
+        return error_msg
+
+
+@app.tool()
+async def suggest_pokemon_by_criteria_interactive(
+    user_input: str | None = None, state: dict | None = None
+) -> str:
+    """Advanced interactive Pokemon suggestion with criteria elicitation.
+
+    Suggests Pokemon based on type and role preferences through a
+    multi-step elicitation process. Handles user preferences and
+    provides alternative suggestions.
+
+    Args:
+        user_input: User's response to current elicitation step
+        state: Conversation state containing preferences and suggestions
+    """
+    logger.info(
+        "suggest_pokemon_by_criteria_interactive called",
+        user_input=user_input,
+        has_state=state is not None,
+    )
+
+    try:
+        result = await INTERACTIVE_TOOLS["suggest_pokemon_by_criteria_elicit"](
+            user_input=user_input, state=state
+        )
+
+        if result.elicit:
+            # Return elicitation prompt to continue conversation
+            return f"ELICIT: {result.elicit['prompt']}"
+        else:
+            # Return final suggestion
+            return str(result.content[0]["text"])
+
+    except Exception as e:
+        error_msg = f"❌ Error: {str(e)}"
+        logger.error("suggest_pokemon_by_criteria_interactive failed", error=str(e))
         return error_msg
 
 
