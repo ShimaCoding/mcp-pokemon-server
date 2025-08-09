@@ -1,0 +1,31 @@
+services:
+  mcp-pokemon-server-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: mcp-pokemon-server-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_SERVER_PORT=8000
+      - MCP_TRANSPORT=streamable-http
+      - LOG_LEVEL=DEBUG
+      - POKEAPI_BASE_URL=https://pokeapi.co/api/v2
+      - PYTHONPATH=/app
+      - PYTEST_CACHE_DIR=/tmp/.pytest_cache
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+      - /app/venv
+      - /app/.pytest_cache
+      - /app/.mypy_cache
+    networks:
+      - mcp-network
+    working_dir: /app
+    command: python -m src.main
+
+networks:
+  mcp-network:
+    driver: bridge

@@ -28,14 +28,30 @@ def add_timestamp(logger: Any, method_name: str, event_dict: EventDict) -> Event
 
 def setup_logging() -> None:
     """Configure structured logging for the application."""
+    import os
+
     settings = get_settings()
 
     # Configure standard library logging
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stderr,
-        level=getattr(logging, settings.log_level.upper()),
-    )
+    # If using stdio transport, be extra careful with stdout
+    if os.getenv("MCP_TRANSPORT", "stdio") == "stdio":
+        # For stdio transport, send all logs to stderr and suppress uvicorn
+        logging.basicConfig(
+            format="%(message)s",
+            stream=sys.stderr,
+            level=getattr(logging, settings.log_level.upper()),
+        )
+        # Suppress uvicorn logs completely for stdio
+        logging.getLogger("uvicorn").setLevel(logging.CRITICAL)
+        logging.getLogger("uvicorn.access").setLevel(logging.CRITICAL)
+        logging.getLogger("uvicorn.error").setLevel(logging.CRITICAL)
+    else:
+        # For other transports, normal logging is fine
+        logging.basicConfig(
+            format="%(message)s",
+            stream=sys.stderr,
+            level=getattr(logging, settings.log_level.upper()),
+        )
 
     # Configure structlog
     processors: list[Processor] = [

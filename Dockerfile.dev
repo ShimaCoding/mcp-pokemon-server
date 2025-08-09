@@ -1,0 +1,45 @@
+# Development Dockerfile for MCP Pokemon Server
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    MCP_SERVER_HOST=0.0.0.0 \
+    MCP_SERVER_PORT=8000
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd --gid 1000 mcpuser && \
+    useradd --uid 1000 --gid mcpuser --shell /bin/bash --create-home mcpuser
+
+# Set work directory
+WORKDIR /app
+
+# Copy dependency files
+COPY pyproject.toml ./
+COPY README.md ./
+
+# Install Python dependencies (including dev dependencies)
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -e ".[dev,test]"
+
+# Create logs and cache directories with proper permissions
+RUN mkdir -p /app/logs /app/.pytest_cache /app/.mypy_cache && \
+    chown -R mcpuser:mcpuser /app
+
+# Switch to non-root user
+USER mcpuser
+
+# Expose port
+EXPOSE 8000
+
+# Default command (can be overridden)
+CMD ["python", "-m", "src.main"]

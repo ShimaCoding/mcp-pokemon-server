@@ -1,0 +1,39 @@
+services:
+  mcp-pokemon-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-pokemon-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_SERVER_PORT=8000
+      - MCP_TRANSPORT=streamable-http
+      - LOG_LEVEL=INFO
+      - POKEAPI_BASE_URL=https://pokeapi.co/api/v2
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - mcp-network
+
+  # Optional: Redis for caching (if needed in the future)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: mcp-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - mcp-network
+  #   command: redis-server --appendonly yes
+
+networks:
+  mcp-network:
+    driver: bridge
+
+# volumes:
+#   redis_data:
