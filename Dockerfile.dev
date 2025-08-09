@@ -31,8 +31,9 @@ COPY README.md ./
 RUN pip install --upgrade pip setuptools wheel && \
     pip install -e ".[dev,test]"
 
-# Create logs directory
-RUN mkdir -p /app/logs && chown -R mcpuser:mcpuser /app
+# Create logs and cache directories with proper permissions
+RUN mkdir -p /app/logs /app/.pytest_cache /app/.mypy_cache && \
+    chown -R mcpuser:mcpuser /app
 
 # Switch to non-root user
 USER mcpuser

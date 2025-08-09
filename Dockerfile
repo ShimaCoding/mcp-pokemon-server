@@ -1,5 +1,6 @@
 # Multi-stage build for MCP Pokemon Server
 FROM python:3.12-slim AS builder
+
 # Add security labels and metadata
 LABEL org.opencontainers.image.title="MCP Pokemon Server" \
     org.opencontainers.image.description="Secure MCP Pokemon Server" \
@@ -14,28 +15,13 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONHASHSEED=random
 
-# Update system and install security updates
+# Update system and install security updates and dependencies
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     ca-certificates \
-    && apt-get clean \
-# Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create and use non-root user
-RUN groupadd --gid 1000 mcpuser && \
-    useradd --uid 1000 --gid mcpuser --shell /bin/bash --create-home mcpuser
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set work directory
 WORKDIR /app

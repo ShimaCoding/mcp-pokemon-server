@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mcp-pokemon-server-dev:
     build:
@@ -16,6 +14,7 @@ services:
       - LOG_LEVEL=DEBUG
       - POKEAPI_BASE_URL=https://pokeapi.co/api/v2
       - PYTHONPATH=/app
+      - PYTEST_CACHE_DIR=/tmp/.pytest_cache
     volumes:
       - .:/app
       - ./logs:/app/logs

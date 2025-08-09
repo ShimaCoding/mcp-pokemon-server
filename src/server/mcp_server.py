@@ -431,8 +431,6 @@ async def create_server() -> FastMCP:
 
 def run_server() -> None:
     """Run the MCP server."""
-    import os
-
     logger.info("Starting Pokemon MCP Server", server_name="Pokemon MCP Server")
 
     # Get transport from environment variable, default to stdio for MCP compatibility
