@@ -1,7 +1,7 @@
 """Interactive elicitation tools for Pokemon MCP server."""
 
-import re
-from typing import Any, Dict, List, Optional
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from ..clients.pokeapi_client import PokemonNotFoundError, get_pokemon_client
 from ..config.logging import get_logger
@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 class ElicitationState:
     """Helper class to manage elicitation state."""
 
-    def __init__(self, state: Dict[str, Any]):
+    def __init__(self, state: dict[str, Any]):
         self.state = state
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -24,7 +24,7 @@ class ElicitationState:
         """Set value in state."""
         self.state[key] = value
 
-    def update(self, updates: Dict[str, Any]) -> None:
+    def update(self, updates: dict[str, Any]) -> None:
         """Update multiple values in state."""
         self.state.update(updates)
 
@@ -33,7 +33,7 @@ class ElicitationState:
         self.state.clear()
 
 
-def create_elicit_response(prompt: str, state: Dict[str, Any]) -> ToolResult:
+def create_elicit_response(prompt: str, state: dict[str, Any]) -> ToolResult:
     """Helper to create an elicitation response."""
     content = [
         {
@@ -45,7 +45,7 @@ def create_elicit_response(prompt: str, state: Dict[str, Any]) -> ToolResult:
 
 
 async def get_pokemon_info_elicit(
-    pokemon_name: Optional[str] = None, state: Optional[Dict[str, Any]] = None
+    pokemon_name: str | None = None, state: dict[str, Any] | None = None
 ) -> ToolResult:
     """
     Interactive Pokemon information retrieval with elicitation.
@@ -133,7 +133,7 @@ async def get_pokemon_info_elicit(
 
 
 async def build_pokemon_team_elicit(
-    pokemon_name: Optional[str] = None, state: Optional[Dict[str, Any]] = None
+    pokemon_name: str | None = None, state: dict[str, Any] | None = None
 ) -> ToolResult:
     """
     Interactive Pokemon team builder with elicitation.
@@ -208,7 +208,7 @@ async def build_pokemon_team_elicit(
                 "\n\n**Equipo actual:**\n"
                 + "\n".join(
                     [
-                        f"{i+1}. {p['name'].title()} (#{p['id']}) - "
+                        f"{i + 1}. {p['name'].title()} (#{p['id']}) - "
                         f"Tipos: {', '.join([t.title() for t in p['types']])}"
                         for i, p in enumerate(team)
                     ]
@@ -236,11 +236,11 @@ async def build_pokemon_team_elicit(
     content = [
         {
             "type": "text",
-            "text": f"# 🎉 ¡Equipo Pokémon Completo!\n\n"
-            f"## 👥 Tu Equipo\n"
+            "text": "# 🎉 ¡Equipo Pokémon Completo!\n\n"
+            "## 👥 Tu Equipo\n"
             + "\n".join(
                 [
-                    f"**{i+1}. {p['name'].title()}** (#{p['id']})\n"
+                    f"**{i + 1}. {p['name'].title()}** (#{p['id']})\n"
                     f"   - Tipos: {', '.join([t.title() for t in p['types']])}\n"
                     f"   - Stats totales: {p['total_stats']}\n"
                     for i, p in enumerate(team)
@@ -258,7 +258,7 @@ async def build_pokemon_team_elicit(
 
 
 async def suggest_pokemon_by_criteria_elicit(
-    user_input: Optional[str] = None, state: Optional[Dict[str, Any]] = None
+    user_input: str | None = None, state: dict[str, Any] | None = None
 ) -> ToolResult:
     """
     Advanced interactive Pokemon suggestion with multiple criteria elicitation.
@@ -389,7 +389,7 @@ async def suggest_pokemon_by_criteria_elicit(
     # Handle restart command at any point
     if user_input and user_input.lower().strip() == "reiniciar":
         return create_elicit_response(
-            "🔄 ¡Empecemos de nuevo!\n\n" "¿Qué tipo de Pokémon prefieres?", {}
+            "🔄 ¡Empecemos de nuevo!\n\n¿Qué tipo de Pokémon prefieres?", {}
         )
 
     # Step 3: Generate or confirm suggestion
@@ -423,7 +423,7 @@ async def suggest_pokemon_by_criteria_elicit(
                 error=str(e),
             )
             return create_elicit_response(
-                f"❌ Error al buscar sugerencias. ¿Quieres intentar de nuevo? (escribe 'reiniciar')",
+                "❌ Error al buscar sugerencias. ¿Quieres intentar de nuevo? (escribe 'reiniciar')",
                 {},
             )
 
@@ -485,8 +485,8 @@ async def suggest_pokemon_by_criteria_elicit(
 
 
 async def _get_pokemon_suggestions_by_criteria(
-    poke_type: str, role: str, excluded: Optional[List[str]] = None
-) -> List[Dict[str, Any]]:
+    poke_type: str, role: str, excluded: list[str] | None = None
+) -> list[dict[str, Any]]:
     """
     Helper function to get Pokemon suggestions based on type and role.
 
@@ -507,7 +507,7 @@ async def _get_pokemon_suggestions_by_criteria(
         suggestions = []
 
         # Sample a few Pokemon from this type (simplified logic)
-        for i, pokemon_entry in enumerate(type_pokemon[:20]):  # Limit to first 20
+        for _i, pokemon_entry in enumerate(type_pokemon[:20]):  # Limit to first 20
             pokemon_name = pokemon_entry["pokemon"]["name"]
 
             if pokemon_name in excluded:
@@ -538,8 +538,8 @@ async def _get_pokemon_suggestions_by_criteria(
 
 
 def _analyze_pokemon_for_role(
-    pokemon: Any, role: str, stats: Dict[str, int]
-) -> Optional[Dict[str, Any]]:
+    pokemon: Any, role: str, stats: dict[str, int]
+) -> dict[str, Any] | None:
     """Analyze if a Pokemon fits a given role."""
     total_stats = sum(stats.values())
 
@@ -602,7 +602,7 @@ def _analyze_pokemon_for_role(
 
 
 # Interactive tools registry
-INTERACTIVE_TOOLS = {
+INTERACTIVE_TOOLS: dict[str, Callable[..., Awaitable[ToolResult]]] = {
     "get_pokemon_info_elicit": get_pokemon_info_elicit,
     "build_pokemon_team_elicit": build_pokemon_team_elicit,
     "suggest_pokemon_by_criteria_elicit": suggest_pokemon_by_criteria_elicit,
