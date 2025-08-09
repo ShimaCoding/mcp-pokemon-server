@@ -15,7 +15,13 @@ setup_logging()
 logger = get_logger(__name__)
 
 # Create FastMCP server instance
-app = FastMCP("Pokemon MCP Server")
+import os
+
+app = FastMCP(
+    "Pokemon MCP Server",
+    host=os.getenv("MCP_SERVER_HOST", "0.0.0.0"),
+    port=int(os.getenv("MCP_SERVER_PORT", "8000")),
+)
 
 # Initialize clients and managers
 pokemon_client = PokemonAPIClient()
@@ -425,11 +431,24 @@ async def create_server() -> FastMCP:
 
 def run_server() -> None:
     """Run the MCP server."""
+    import os
+
     logger.info("Starting Pokemon MCP Server", server_name="Pokemon MCP Server")
 
+    # Get transport from environment variable, default to stdio for MCP compatibility
+    transport = os.getenv("MCP_TRANSPORT", "stdio")
+    logger.info("Using transport", transport=transport)
+
     try:
-        # FastMCP handles asyncio internally - just run the app
-        app.run()
+        # FastMCP handles asyncio internally - just run the app with specified transport
+        if transport == "stdio":
+            # For stdio, we need to suppress uvicorn logging to avoid JSON parsing errors
+            import logging
+
+            logging.getLogger("uvicorn").setLevel(logging.WARNING)
+            logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
+        app.run(transport=transport)  # type: ignore
 
     except KeyboardInterrupt:
         logger.info("Server shutdown requested")
