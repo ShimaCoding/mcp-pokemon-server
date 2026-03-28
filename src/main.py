@@ -1,12 +1,6 @@
 """Main entry point for MCP Pokemon Server."""
 
 import sys
-from pathlib import Path
-
-# Add project root to Python path for imports
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(Path(__file__).parent))
 
 from src.config.logging import get_logger, setup_logging
 from src.server.mcp_server import run_server
@@ -21,7 +15,6 @@ def main() -> None:
     logger.info("Starting MCP Pokemon Server application")
 
     try:
-        # Run the server directly (FastMCP handles asyncio internally)
         run_server()
     except KeyboardInterrupt:
         logger.info("Application stopped by user")

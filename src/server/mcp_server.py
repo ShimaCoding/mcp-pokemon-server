@@ -1,10 +1,16 @@
 """MCP server implementation using FastMCP."""
 
+import logging
+import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
 from mcp.server.fastmcp import FastMCP
 from mcp.types import GetPromptResult, PromptMessage, TextContent
 
 from ..clients.pokeapi_client import PokemonAPIClient
 from ..config.logging import get_logger, setup_logging
+from ..config.settings import get_settings
 from ..prompts.battle_prompts import BattlePromptManager
 from ..prompts.educational_prompts import EducationalPromptManager
 from ..resources.pokemon_resources import PokemonResourceManager
@@ -14,20 +20,34 @@ from ..tools.pokemon_tools import POKEMON_TOOLS
 setup_logging()
 logger = get_logger(__name__)
 
-# Create FastMCP server instance
-import os
+settings = get_settings()
 
-app = FastMCP(
-    "Pokemon MCP Server",
-    host=os.getenv("MCP_SERVER_HOST", "0.0.0.0"),
-    port=int(os.getenv("MCP_SERVER_PORT", "8000")),
-)
-
-# Initialize clients and managers
+# Initialize clients and managers (http client started in lifespan)
 pokemon_client = PokemonAPIClient()
 resource_manager = PokemonResourceManager(pokemon_client)
 educational_prompts = EducationalPromptManager(pokemon_client)
 battle_prompts = BattlePromptManager(pokemon_client)
+
+
+@asynccontextmanager
+async def lifespan(server: FastMCP) -> AsyncGenerator[None, None]:
+    """Manage server lifecycle: start and close the HTTP client."""
+    logger.info("Server startup: initializing PokéAPI client")
+    await pokemon_client.start()
+    try:
+        yield
+    finally:
+        logger.info("Server shutdown: closing PokéAPI client")
+        await pokemon_client.close()
+
+
+# Create FastMCP server instance
+app = FastMCP(
+    "Pokemon MCP Server",
+    host=settings.server_host,
+    port=settings.server_port,
+    lifespan=lifespan,
+)
 
 
 @app.tool()
@@ -431,45 +451,30 @@ async def create_server() -> FastMCP:
 
 def run_server() -> None:
     """Run the MCP server."""
-    logger.info("Starting Pokemon MCP Server", server_name="Pokemon MCP Server")
-
-    # Get transport from environment variable, default to stdio for MCP compatibility
-    transport = os.getenv("MCP_TRANSPORT", "stdio")
-    logger.info("Using transport", transport=transport)
+    logger.info("Starting Pokemon MCP Server", transport=settings.transport)
 
     try:
-        # FastMCP handles asyncio internally - just run the app with specified transport
-        if transport == "stdio":
-            # For stdio, we need to suppress uvicorn logging to avoid JSON parsing errors
-            import logging
-
+        if settings.transport == "stdio":
             logging.getLogger("uvicorn").setLevel(logging.WARNING)
             logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+            app.run(transport="stdio")
+        else:
+            import uvicorn
 
-        app.run(transport=transport)  # type: ignore
-
+            uvicorn.run(
+                app.streamable_http_app(),
+                host=settings.server_host,
+                port=settings.server_port,
+                workers=settings.uvicorn_workers,
+                timeout_keep_alive=settings.uvicorn_timeout_keep_alive,
+                access_log=settings.uvicorn_access_log,
+            )
     except KeyboardInterrupt:
         logger.info("Server shutdown requested")
     except Exception as e:
         logger.error("Server error", error=str(e), exc_info=True)
         raise
-    finally:
-        # Cleanup
-        logger.info("Cleaning up server resources")
-        logger.info("Resources cleaned up successfully")
-
-
-def cleanup_resources() -> None:
-    """Cleanup server resources."""
-    logger.info("Cleaning up server resources")
-
-    try:
-        # Simple cleanup without async
-        logger.info("Resources cleaned up successfully")
-    except Exception as e:
-        logger.error("Error during cleanup", error=str(e))
 
 
 if __name__ == "__main__":
-    # This allows running the server directly for testing
     run_server()

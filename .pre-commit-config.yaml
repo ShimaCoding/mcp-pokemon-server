@@ -1,7 +1,4 @@
-#!/bin/bash
-
-# Script para probar pre-commit básico sin todos los checks
-# Pre-commit configuration for MCP Pokemon Server (Basic)
+# Pre-commit configuration for MCP Pokemon Server
 
 repos:
   # Built-in hooks

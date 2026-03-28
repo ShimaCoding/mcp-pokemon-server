@@ -145,6 +145,17 @@ health: ## Check if the server is responding
 	@printf "$(BLUE)[INFO]$(NC) Checking server health...\n"
 	@curl -f http://localhost:8000/mcp || printf "$(RED)[ERROR]$(NC) Server is not responding\n"
 
+# Local run targets (no Docker)
+.PHONY: run-local
+run-local: ## Run server locally with stdio transport (development)
+	@printf "$(BLUE)[INFO]$(NC) Running server locally (stdio)...\n"
+	@MCP_TRANSPORT=stdio python -m src.main
+
+.PHONY: run-uvicorn
+run-uvicorn: ## Run server locally with uvicorn (HTTP transport)
+	@printf "$(BLUE)[INFO]$(NC) Running server locally with uvicorn on http://localhost:8000...\n"
+	@MCP_TRANSPORT=streamable-http MCP_SERVER_HOST=127.0.0.1 MCP_SERVER_PORT=8000 python -m src.main
+
 # Install dependencies locally
 .PHONY: install
 install: ## Install Python dependencies locally

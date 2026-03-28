@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     # Server Configuration
     server_host: str = Field(default="localhost", alias="MCP_SERVER_HOST")
     server_port: int = Field(default=8000, alias="MCP_SERVER_PORT")
+    transport: str = Field(default="stdio", alias="MCP_TRANSPORT")
+
+    # Uvicorn Configuration
+    uvicorn_workers: int = Field(default=1, alias="UVICORN_WORKERS")
+    uvicorn_timeout_keep_alive: int = Field(default=30, alias="UVICORN_TIMEOUT_KEEP_ALIVE")
+    uvicorn_access_log: bool = Field(default=True, alias="UVICORN_ACCESS_LOG")
 
     # PokéAPI Configuration
     pokeapi_base_url: str = Field(

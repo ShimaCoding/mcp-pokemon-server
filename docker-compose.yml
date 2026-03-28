@@ -18,6 +18,9 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-mcp_redis_secret}
+      - UVICORN_WORKERS=${UVICORN_WORKERS:-1}
+      - UVICORN_TIMEOUT_KEEP_ALIVE=${UVICORN_TIMEOUT_KEEP_ALIVE:-30}
+      - UVICORN_ACCESS_LOG=${UVICORN_ACCESS_LOG:-true}
     depends_on:
       redis:
         condition: service_healthy
