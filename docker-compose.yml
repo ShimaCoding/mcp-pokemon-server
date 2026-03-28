@@ -35,5 +35,5 @@ networks:
   mcp-network:
     driver: bridge
 
-# volumes:
-#   redis_data:
+volumes:
+  redis_data:
