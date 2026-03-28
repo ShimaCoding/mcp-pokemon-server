@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     container_name: mcp-pokemon-server
     restart: unless-stopped
     ports:
@@ -13,27 +14,71 @@ services:
       - MCP_TRANSPORT=streamable-http
       - LOG_LEVEL=INFO
       - POKEAPI_BASE_URL=https://pokeapi.co/api/v2
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-mcp_redis_secret}
+    depends_on:
+      redis:
+        condition: service_healthy
     volumes:
       - ./logs:/app/logs
     networks:
       - mcp-network
+      - mcp-backend
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/mcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
 
-  Optional: Redis for caching (if needed in the future)
   redis:
     image: redis:7-alpine
     container_name: mcp-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    # No external ports exposed — only accessible within mcp-network
     volumes:
       - redis_data:/data
     networks:
-      - mcp-network
-    command: redis-server --appendonly yes
+      - mcp-backend
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD:-mcp_redis_secret}
+      --rename-command FLUSHDB ""
+      --rename-command FLUSHALL ""
+      --rename-command DEBUG ""
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-mcp_redis_secret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
 
 networks:
   mcp-network:
     driver: bridge
+  mcp-backend:
+    driver: bridge
+    internal: true
 
 volumes:
   redis_data:
