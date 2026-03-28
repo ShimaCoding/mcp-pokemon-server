@@ -18,18 +18,18 @@ services:
     networks:
       - mcp-network
 
-  # Optional: Redis for caching (if needed in the future)
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: mcp-redis
-  #   restart: unless-stopped
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis_data:/data
-  #   networks:
-  #     - mcp-network
-  #   command: redis-server --appendonly yes
+  Optional: Redis for caching (if needed in the future)
+  redis:
+    image: redis:7-alpine
+    container_name: mcp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mcp-network
+    command: redis-server --appendonly yes
 
 networks:
   mcp-network:
