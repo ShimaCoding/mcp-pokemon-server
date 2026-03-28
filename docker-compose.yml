@@ -6,8 +6,9 @@ services:
       target: production
     container_name: mcp-pokemon-server
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    # Port mapping managed by Dokploy/Traefik — set container port to 8000 in Dokploy UI
+    # ports:
+    #   - "8080:8000"  # Uncomment ONLY for local testing outside Dokploy
     environment:
       - MCP_SERVER_HOST=0.0.0.0
       - MCP_SERVER_PORT=8000
@@ -26,7 +27,7 @@ services:
       - mcp-network
       - mcp-backend
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8000/mcp"]
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 8000)); s.close()"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -51,9 +51,9 @@ ENV PYTHONUNBUFFERED=1 \
     MCP_SERVER_HOST=0.0.0.0 \
     MCP_SERVER_PORT=8000
 
-# Install only essential runtime dependencies
+# No extra runtime deps needed — Python stdlib handles healthcheck
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
+    apt-get upgrade -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -81,9 +81,10 @@ USER mcpuser
 # Expose port
 EXPOSE 8000
 
-# Health check — verify the MCP server process is listening
+# Health check — verify TCP port is open using Python's built-in socket
+# (MCP endpoint requires special Accept headers, so HTTP-level check would always 406)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -sf http://localhost:8000/mcp || curl -sf http://localhost:8000/ || exit 1
+    CMD python -c "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 8000)); s.close()" || exit 1
 
 # Default command
 CMD ["python", "-m", "src.main"]
