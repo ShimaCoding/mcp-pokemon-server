@@ -57,6 +57,7 @@ class Pokemon(BaseModel):
     abilities: list[PokemonAbility]
     sprites: PokemonSprites
     moves: list[PokemonMove] | None = None
+    species: dict[str, str] | None = None  # name and url, used to resolve species for alternate forms
 
     @property
     def height_meters(self) -> float:
@@ -89,6 +90,7 @@ class PokemonSpecies(BaseModel):
     habitat: dict[str, str] | None = None
     is_legendary: bool
     is_mythical: bool
+    capture_rate: int | None = None
     flavor_text_entries: list[dict[str, Any]] | None = None
 
 

@@ -131,6 +131,30 @@ async def analyze_pokemon_stats(name_or_id: str) -> str:
         return error_msg
 
 
+@app.tool()
+async def get_pokedex_entry(pokemon: str) -> str:
+    """Get a complete Pokédex entry for a Pokémon, including flavor texts.
+
+    Returns a JSON object with types, base stats, abilities, height, weight,
+    flavor text descriptions (Spanish preferred, English fallback), generation,
+    habitat, legendary/mythical status, and capture rate. Ideal for narration
+    by the Dexter persona.
+
+    Args:
+        pokemon: Pokémon name (e.g. 'pikachu') or Pokédex number (e.g. '25').
+                 Alternate forms are supported (e.g. 'pikachu-alola').
+    """
+    logger.info("get_pokedex_entry called", identifier=pokemon)
+
+    try:
+        result = await POKEMON_TOOLS["get_pokedex_entry"](pokemon)
+        return str(result.content[0]["text"])
+    except Exception as e:
+        error_msg = f"❌ Error: {str(e)}"
+        logger.error("get_pokedex_entry failed", error=str(e))
+        return error_msg
+
+
 # Resource handlers - Dynamic Pokemon Resources
 @app.resource("pokemon://info/{name_or_id}")
 async def pokemon_info_resource(name_or_id: str) -> str:

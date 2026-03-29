@@ -8,12 +8,14 @@ from src.clients.pokeapi_client import PokemonNotFoundError
 from src.models.pokemon_models import (
     Pokemon,
     PokemonAbility,
+    PokemonSpecies,
     PokemonSprites,
     PokemonStat,
     PokemonType,
 )
 from src.tools.pokemon_tools import (
     analyze_pokemon_stats,
+    get_pokedex_entry,
     get_pokemon_info,
     get_type_effectiveness,
     search_pokemon,
@@ -176,3 +178,176 @@ async def test_tool_error_handling():
 
         assert result.is_error
         assert "Error retrieving Pokemon information" in result.content[0]["text"]
+
+
+# ---------------------------------------------------------------------------
+# get_pokedex_entry tests
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def sample_pokemon_with_species():
+    """Pikachu Pokemon model with species URL populated."""
+    return Pokemon(
+        id=25,
+        name="pikachu",
+        height=4,
+        weight=60,
+        base_experience=112,
+        species={
+            "name": "pikachu",
+            "url": "https://pokeapi.co/api/v2/pokemon-species/25/",
+        },
+        types=[
+            PokemonType(
+                slot=1,
+                type={"name": "electric", "url": "https://pokeapi.co/api/v2/type/13/"},
+            )
+        ],
+        stats=[
+            PokemonStat(
+                base_stat=35,
+                effort=0,
+                stat={"name": "hp", "url": "https://pokeapi.co/api/v2/stat/1/"},
+            ),
+            PokemonStat(
+                base_stat=55,
+                effort=2,
+                stat={"name": "speed", "url": "https://pokeapi.co/api/v2/stat/6/"},
+            ),
+        ],
+        abilities=[
+            PokemonAbility(
+                ability={"name": "static", "url": "https://pokeapi.co/api/v2/ability/9/"},
+                is_hidden=False,
+                slot=1,
+            )
+        ],
+        sprites=PokemonSprites(
+            front_default="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png"
+        ),
+    )
+
+
+@pytest.fixture
+def sample_species():
+    """Pikachu PokemonSpecies model."""
+    return PokemonSpecies(
+        id=25,
+        name="pikachu",
+        color={"name": "yellow", "url": "https://pokeapi.co/api/v2/pokemon-color/10/"},
+        generation={"name": "generation-i", "url": "https://pokeapi.co/api/v2/generation/1/"},
+        habitat={"name": "forest", "url": "https://pokeapi.co/api/v2/pokemon-habitat/4/"},
+        is_legendary=False,
+        is_mythical=False,
+        capture_rate=190,
+        flavor_text_entries=[
+            {
+                "flavor_text": "Cuando varios de estos POKEMON se juntan, su electricidad puede provocar tormentas.",
+                "language": {"name": "es", "url": "https://pokeapi.co/api/v2/language/7/"},
+                "version": {"name": "x", "url": ""},
+            },
+            {
+                "flavor_text": "When several of these POKéMON gather, their electricity can cause lightning storms.",
+                "language": {"name": "en", "url": "https://pokeapi.co/api/v2/language/9/"},
+                "version": {"name": "x", "url": ""},
+            },
+        ],
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_pokedex_entry_success(sample_pokemon_with_species, sample_species):
+    """Test successful Pokédex entry retrieval with full JSON output."""
+    import json
+
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        mock_api_client = AsyncMock()
+        mock_api_client.get_pokemon.return_value = sample_pokemon_with_species
+        mock_api_client.get_pokemon_species.return_value = sample_species
+        mock_client.return_value = mock_api_client
+
+        result = await get_pokedex_entry("pikachu")
+
+        assert not result.is_error
+        data = json.loads(result.content[0]["text"])
+
+        assert data["id"] == 25
+        assert data["name"] == "pikachu"
+        assert data["types"] == ["electric"]
+        assert data["base_stats"]["hp"] == 35
+        assert data["abilities"][0]["name"] == "static"
+        assert data["abilities"][0]["is_hidden"] is False
+        assert data["generation"] == "I"
+        assert data["habitat"] == "forest"
+        assert data["is_legendary"] is False
+        assert data["is_mythical"] is False
+        assert data["capture_rate"] == 190
+        # Spanish flavor text should be preferred
+        assert len(data["flavor_text"]) == 1
+        assert "POKEMON" in data["flavor_text"][0]
+        # Species resolution uses the URL, not the pokemon id
+        mock_api_client.get_pokemon_species.assert_called_once_with("25")
+
+
+@pytest.mark.asyncio
+async def test_get_pokedex_entry_not_found():
+    """Test Pokédex entry for an unknown Pokémon."""
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        mock_api_client = AsyncMock()
+        mock_api_client.get_pokemon.side_effect = PokemonNotFoundError("Not found")
+        mock_client.return_value = mock_api_client
+
+        result = await get_pokedex_entry("fakemon")
+
+        assert result.is_error
+        assert "not found" in result.content[0]["text"].lower()
+
+
+@pytest.mark.asyncio
+async def test_get_pokedex_entry_generic_error():
+    """Test Pokédex entry on generic API error."""
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        mock_api_client = AsyncMock()
+        mock_api_client.get_pokemon.side_effect = Exception("Network failure")
+        mock_client.return_value = mock_api_client
+
+        result = await get_pokedex_entry("pikachu")
+
+        assert result.is_error
+        assert "Error retrieving Pok\u00e9dex entry" in result.content[0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_get_pokedex_entry_fallback_to_english(sample_pokemon_with_species):
+    """Test that English flavor text is used when Spanish is absent."""
+    import json
+
+    species_no_es = PokemonSpecies(
+        id=25,
+        name="pikachu",
+        color={"name": "yellow", "url": ""},
+        generation={"name": "generation-i", "url": ""},
+        is_legendary=False,
+        is_mythical=False,
+        capture_rate=190,
+        flavor_text_entries=[
+            {
+                "flavor_text": "It can generate electric attacks from the electric pouches located in both of its cheeks.",
+                "language": {"name": "en", "url": ""},
+                "version": {"name": "red", "url": ""},
+            },
+        ],
+    )
+
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        mock_api_client = AsyncMock()
+        mock_api_client.get_pokemon.return_value = sample_pokemon_with_species
+        mock_api_client.get_pokemon_species.return_value = species_no_es
+        mock_client.return_value = mock_api_client
+
+        result = await get_pokedex_entry("pikachu")
+
+        assert not result.is_error
+        data = json.loads(result.content[0]["text"])
+        assert len(data["flavor_text"]) == 1
+        assert "electric pouches" in data["flavor_text"][0]
