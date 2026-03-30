@@ -17,6 +17,46 @@ class BattlePromptManager:
         self.pokemon_client = pokemon_client
         self.logger = logger
 
+    async def _get_species_for_pokemon(self, pokemon_data: Any) -> Any | None:
+        """Fetch species data for a Pokemon, correctly resolving alternate forms."""
+        try:
+            if pokemon_data.species and pokemon_data.species.get("url"):
+                species_id = pokemon_data.species["url"].strip("/").split("/")[-1]
+            else:
+                species_id = str(pokemon_data.id)
+            return await self.pokemon_client.get_pokemon_species(species_id)
+        except Exception as e:
+            self.logger.warning(
+                "Could not fetch species data",
+                pokemon=pokemon_data.name,
+                error=str(e),
+            )
+            return None
+
+    def _collect_flavor_text(self, species: Any) -> str:
+        """Return up to 2 deduplicated flavor texts, preferring Spanish over English."""
+
+        def _texts(lang: str) -> list[str]:
+            seen: set[str] = set()
+            result: list[str] = []
+            for entry in species.flavor_text_entries or []:
+                if entry["language"]["name"] == lang:
+                    text = (
+                        entry["flavor_text"]
+                        .replace("\f", " ")
+                        .replace("\n", " ")
+                        .strip()
+                    )
+                    if text and text not in seen:
+                        seen.add(text)
+                        result.append(text)
+                        if len(result) == 2:
+                            break
+            return result
+
+        texts = _texts("es") or _texts("en")
+        return " ".join(texts)
+
     async def create_battle_strategy_prompt(
         self,
         user_team: list[str],
@@ -33,20 +73,28 @@ class BattlePromptManager:
             strategy_focus: offensive, defensive, balanced, or utility
         """
         try:
-            # Get data for user's team
+            # Get data for user's team (pokemon + species for richer context)
             user_team_data = []
+            user_species_map: dict[str, Any] = {}
             for pokemon_name in user_team[:6]:  # Max 6 Pokemon
                 pokemon_data = await self.pokemon_client.get_pokemon(pokemon_name)
                 if pokemon_data:
                     user_team_data.append(pokemon_data)
+                    species = await self._get_species_for_pokemon(pokemon_data)
+                    if species:
+                        user_species_map[pokemon_data.name] = species
 
             # Get data for opponent's team if provided
             opponent_team_data = []
+            opponent_species_map: dict[str, Any] = {}
             if opponent_team:
                 for pokemon_name in opponent_team[:6]:
                     pokemon_data = await self.pokemon_client.get_pokemon(pokemon_name)
                     if pokemon_data:
                         opponent_team_data.append(pokemon_data)
+                        species = await self._get_species_for_pokemon(pokemon_data)
+                        if species:
+                            opponent_species_map[pokemon_data.name] = species
 
             context = self._build_battle_strategy_context(
                 user_team_data, opponent_team_data, battle_format, strategy_focus
@@ -58,6 +106,8 @@ class BattlePromptManager:
                 battle_format,
                 strategy_focus,
                 context,
+                user_species_map,
+                opponent_species_map,
             )
 
             description = (
@@ -105,7 +155,7 @@ class BattlePromptManager:
             environment: neutral, weather, terrain effects
         """
         try:
-            # Get Pokemon data
+            # Get Pokemon data (+ species for richer context)
             pokemon1_data = await self.pokemon_client.get_pokemon(pokemon1)
             pokemon2_data = await self.pokemon_client.get_pokemon(pokemon2)
 
@@ -129,12 +179,16 @@ class BattlePromptManager:
                     ],
                 )
 
+            species1 = await self._get_species_for_pokemon(pokemon1_data)
+            species2 = await self._get_species_for_pokemon(pokemon2_data)
+
             context = self._build_matchup_analysis_context(
                 pokemon1_data, pokemon2_data, scenario, environment
             )
 
             prompt_text = self._generate_matchup_analysis_prompt_text(
-                pokemon1_data, pokemon2_data, scenario, environment, context
+                pokemon1_data, pokemon2_data, scenario, environment, context,
+                species1, species2,
             )
 
             return GetPromptResult(
@@ -174,12 +228,16 @@ class BattlePromptManager:
             focus_areas: specific areas to focus on (offense, defense, synergy, etc.)
         """
         try:
-            # Get team data
+            # Get team data (+ species for richer context)
             team_data = []
+            species_map: dict[str, Any] = {}
             for pokemon_name in team[:6]:
                 pokemon_data = await self.pokemon_client.get_pokemon(pokemon_name)
                 if pokemon_data:
                     team_data.append(pokemon_data)
+                    species = await self._get_species_for_pokemon(pokemon_data)
+                    if species:
+                        species_map[pokemon_data.name] = species
 
             if not team_data:
                 return GetPromptResult(
@@ -199,7 +257,7 @@ class BattlePromptManager:
                 team_data, analysis_depth, focus_areas
             )
             prompt_text = self._generate_team_preview_prompt_text(
-                team_data, analysis_depth, focus_areas, context
+                team_data, analysis_depth, focus_areas, context, species_map
             )
 
             return GetPromptResult(
@@ -273,9 +331,13 @@ class BattlePromptManager:
         battle_format: str,
         strategy_focus: str,
         context: dict[str, Any],
+        user_species_map: dict[str, Any] | None = None,
+        opponent_species_map: dict[str, Any] | None = None,
     ) -> str:
         """Generate battle strategy prompt text."""
-        user_team_summary = self._create_team_summary(user_team_data)
+        user_species_map = user_species_map or {}
+        opponent_species_map = opponent_species_map or {}
+        user_team_summary = self._create_team_summary(user_team_data, user_species_map)
 
         base_prompt = f"""
 {context["system_message"]}
@@ -292,7 +354,9 @@ My Team:
 """
 
         if opponent_team_data:
-            opponent_team_summary = self._create_team_summary(opponent_team_data)
+            opponent_team_summary = self._create_team_summary(
+                opponent_team_data, opponent_species_map
+            )
             base_prompt += f"""
 Opponent's Team:
 {opponent_team_summary}
@@ -369,10 +433,12 @@ Please provide:
         scenario: str,
         environment: str,
         context: dict[str, Any],
+        species1: Any | None = None,
+        species2: Any | None = None,
     ) -> str:
         """Generate matchup analysis prompt text."""
-        pokemon1_summary = self._create_pokemon_summary(pokemon1_data)
-        pokemon2_summary = self._create_pokemon_summary(pokemon2_data)
+        pokemon1_summary = self._create_pokemon_summary(pokemon1_data, species1)
+        pokemon2_summary = self._create_pokemon_summary(pokemon2_data, species2)
 
         return f"""
 {context["system_message"]}
@@ -438,9 +504,10 @@ Consider both offensive and defensive perspectives for a complete analysis.
         analysis_depth: str,
         focus_areas: list[str] | None,
         context: dict[str, Any],
+        species_map: dict[str, Any] | None = None,
     ) -> str:
         """Generate team preview prompt text."""
-        team_summary = self._create_detailed_team_summary(team_data)
+        team_summary = self._create_detailed_team_summary(team_data, species_map or {})
         focus_areas_text = ", ".join(context["focus_areas"])
 
         base_prompt = f"""
@@ -490,30 +557,46 @@ Analysis Depth: {context["depth_description"]}
 
         return base_prompt + "Please provide:\n" + "\n".join(sections)
 
-    def _create_team_summary(self, team_data: list[Any]) -> str:
+    def _create_team_summary(
+        self,
+        team_data: list[Any],
+        species_map: dict[str, Any] | None = None,
+    ) -> str:
         """Create a concise team summary."""
+        species_map = species_map or {}
         summaries = []
         for i, pokemon in enumerate(team_data, 1):
             name = pokemon.name
             types = [ptype.type["name"] for ptype in pokemon.types]
             types_str = ", ".join(types)
-
-            # Calculate BST
             bst = sum(stat.base_stat for stat in pokemon.stats)
 
-            summaries.append(f"{i}. {name} ({types_str}) - BST: {bst}")
+            markers = []
+            s = species_map.get(name)
+            if s:
+                if s.is_legendary:
+                    markers.append("Legendary")
+                elif s.is_mythical:
+                    markers.append("Mythical")
+            marker_str = f" [{', '.join(markers)}]" if markers else ""
+
+            summaries.append(f"{i}. {name} ({types_str}) - BST: {bst}{marker_str}")
 
         return "\n".join(summaries)
 
-    def _create_detailed_team_summary(self, team_data: list[Any]) -> str:
+    def _create_detailed_team_summary(
+        self,
+        team_data: list[Any],
+        species_map: dict[str, Any] | None = None,
+    ) -> str:
         """Create a detailed team summary with more information."""
+        species_map = species_map or {}
         summaries = []
         for i, pokemon in enumerate(team_data, 1):
             name = pokemon.name
             types = [ptype.type["name"] for ptype in pokemon.types]
             types_str = ", ".join(types)
 
-            # Extract stats
             stats = {}
             for stat in pokemon.stats:
                 stat_name = stat.stat["name"].replace("-", "_")
@@ -533,24 +616,40 @@ Analysis Depth: {context["depth_description"]}
             abilities = [ability.ability["name"] for ability in pokemon.abilities]
             abilities_text = ", ".join(abilities[:2]) if abilities else "Unknown"
 
+            species_lines = ""
+            s = species_map.get(name)
+            if s:
+                status = (
+                    "Legendary" if s.is_legendary
+                    else "Mythical" if s.is_mythical
+                    else "Regular"
+                )
+                gen_raw = s.generation.get("name", "")
+                generation = gen_raw.replace("generation-", "").upper() if gen_raw else "?"
+                habitat = s.habitat["name"] if s.habitat else "unknown"
+                flavor = self._collect_flavor_text(s)
+                species_lines = (
+                    f"   Status: {status} | Generation: {generation} | Habitat: {habitat}\n"
+                    f"   Capture Rate: {s.capture_rate}\n"
+                    + (f"   Lore: {flavor}\n" if flavor else "")
+                )
+
             summaries.append(
-                f"""
-{i}. {name}
-   Type(s): {types_str}
-   Stats: {stat_line}
-   Abilities: {abilities_text}
-"""
+                f"{i}. {name}\n"
+                f"   Type(s): {types_str}\n"
+                f"   Stats: {stat_line}\n"
+                f"   Abilities: {abilities_text}\n"
+                f"{species_lines}"
             )
 
         return "\n".join(summaries)
 
-    def _create_pokemon_summary(self, pokemon_data: Any) -> str:
-        """Create a summary for a single Pokemon."""
+    def _create_pokemon_summary(self, pokemon_data: Any, species_data: Any | None = None) -> str:
+        """Create a summary for a single Pokemon, enriched with species data when available."""
         name = pokemon_data.name
         types = [ptype.type["name"] for ptype in pokemon_data.types]
         types_str = ", ".join(types)
 
-        # Extract stats
         stats = {}
         for stat in pokemon_data.stats:
             stat_name = stat.stat["name"].replace("-", "_")
@@ -570,7 +669,27 @@ Analysis Depth: {context["depth_description"]}
         abilities = [ability.ability["name"] for ability in pokemon_data.abilities]
         abilities_text = ", ".join(abilities) if abilities else "Unknown"
 
-        return f"""{name.title()}:
-Type(s): {types_str}
-Stats: {stat_line}
-Abilities: {abilities_text}"""
+        species_section = ""
+        if species_data:
+            status = (
+                "Legendary" if species_data.is_legendary
+                else "Mythical" if species_data.is_mythical
+                else "Regular"
+            )
+            gen_raw = species_data.generation.get("name", "")
+            generation = gen_raw.replace("generation-", "").upper() if gen_raw else "?"
+            habitat = species_data.habitat["name"] if species_data.habitat else "unknown"
+            flavor = self._collect_flavor_text(species_data)
+            species_section = (
+                f"\nStatus: {status} | Generation: {generation} | Habitat: {habitat}"
+                f"\nCapture Rate: {species_data.capture_rate}"
+                + (f"\nLore: {flavor}" if flavor else "")
+            )
+
+        return (
+            f"{name.title()}:\n"
+            f"Type(s): {types_str}\n"
+            f"Stats: {stat_line}\n"
+            f"Abilities: {abilities_text}"
+            f"{species_section}"
+        )

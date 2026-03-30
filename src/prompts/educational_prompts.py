@@ -48,9 +48,24 @@ class EducationalPromptManager:
                     ],
                 )
 
+            # Fetch species data for richer context (flavor text, generation, etc.)
+            species_data = None
+            try:
+                if pokemon_data.species and pokemon_data.species.get("url"):
+                    species_id = pokemon_data.species["url"].strip("/").split("/")[-1]
+                else:
+                    species_id = str(pokemon_data.id)
+                species_data = await self.pokemon_client.get_pokemon_species(species_id)
+            except Exception as e:
+                self.logger.warning(
+                    "Could not fetch species data for analysis prompt",
+                    pokemon=pokemon_name,
+                    error=str(e),
+                )
+
             # Build context based on analysis type and user level
             context = self._build_analysis_context(
-                pokemon_data, analysis_type, user_level
+                pokemon_data, analysis_type, user_level, species_data
             )
 
             prompt_text = self._generate_analysis_prompt_text(
@@ -173,6 +188,7 @@ class EducationalPromptManager:
         pokemon_data: Any,  # Pokemon model instance
         analysis_type: str,
         user_level: str,
+        species_data: Any | None = None,
     ) -> dict[str, Any]:
         """Build context for Pokemon analysis prompts."""
         # Extract stats as dictionary
@@ -222,7 +238,45 @@ class EducationalPromptManager:
             "types": ", ".join(types),
             "base_stat_total": sum(base_stats.values()) if base_stats else 0,
             "primary_abilities": ", ".join(abilities[:2]) if abilities else "Unknown",
+            # Species-derived fields (populated when available)
+            "is_legendary": getattr(species_data, "is_legendary", False) if species_data else False,
+            "is_mythical": getattr(species_data, "is_mythical", False) if species_data else False,
+            "generation": (
+                species_data.generation.get("name", "").replace("generation-", "").upper()
+                if species_data and species_data.generation
+                else ""
+            ),
+            "habitat": (
+                species_data.habitat["name"]
+                if species_data and species_data.habitat
+                else ""
+            ),
+            "flavor_text": self._collect_flavor_text(species_data) if species_data else "",
         }
+
+    def _collect_flavor_text(self, species: Any) -> str:
+        """Return up to 2 deduplicated flavor texts, preferring Spanish over English."""
+
+        def _texts(lang: str) -> list[str]:
+            seen: set[str] = set()
+            result: list[str] = []
+            for entry in species.flavor_text_entries or []:
+                if entry["language"]["name"] == lang:
+                    text = (
+                        entry["flavor_text"]
+                        .replace("\f", " ")
+                        .replace("\n", " ")
+                        .strip()
+                    )
+                    if text and text not in seen:
+                        seen.add(text)
+                        result.append(text)
+                        if len(result) == 2:
+                            break
+            return result
+
+        texts = _texts("es") or _texts("en")
+        return " ".join(texts)
 
     def _generate_analysis_prompt_text(
         self,
@@ -237,6 +291,19 @@ class EducationalPromptManager:
         bst = context["base_stat_total"]
         abilities = context["primary_abilities"]
 
+        # Optional species lines
+        species_lines = ""
+        if context.get("generation"):
+            species_lines += f"- Generation: {context['generation']}\n"
+        if context.get("habitat"):
+            species_lines += f"- Habitat: {context['habitat']}\n"
+        if context.get("is_legendary"):
+            species_lines += "- Status: Legendary\n"
+        elif context.get("is_mythical"):
+            species_lines += "- Status: Mythical\n"
+        if context.get("flavor_text"):
+            species_lines += f"- Pokédex Description: {context['flavor_text']}\n"
+
         base_prompt = f"""
 You are {context["system_message"].lower()}
 
@@ -247,7 +314,7 @@ Pokemon Details:
 - Types: {types}
 - Base Stat Total: {bst}
 - Key Abilities: {abilities}
-
+{species_lines}
 """
 
         level_specific_additions = {
