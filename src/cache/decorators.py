@@ -57,7 +57,7 @@ def cached(ttl: int = 3600, key_prefix: str = "cache") -> Callable[[F], F]:
             if cache is not None and cache._available:
                 cached_value = await cache.get(key)
                 if cached_value is not None:
-                    logger.info("Cache HIT — returning cached result", key=key)
+                    logger.info("[CACHE HIT]", key=key)
                     return cached_value
 
             # Cache miss or unavailable — execute original function
@@ -77,6 +77,7 @@ def cached(ttl: int = 3600, key_prefix: str = "cache") -> Callable[[F], F]:
                     serializable = result
 
                 await cache.set(key, serializable, ttl=ttl)
+                logger.info("[CACHE SET]", key=key, ttl=ttl)
 
             return result
 

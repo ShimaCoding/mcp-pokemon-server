@@ -128,7 +128,7 @@ class PokemonAPIClient:
         if cache is not None:
             cached_data = await cache.get(key)
             if cached_data is not None:
-                logger.info("Cache HIT — returning cached Pokemon", identifier=identifier)
+                logger.info("[CACHE HIT] Pokemon", identifier=identifier, key=key)
                 return Pokemon(**cached_data)
 
         logger.info("Fetching Pokemon", identifier=identifier)
@@ -140,6 +140,7 @@ class PokemonAPIClient:
             )
             if cache is not None:
                 await cache.set(key, pokemon.model_dump(mode="json"), ttl=3600)
+                logger.info("[CACHE SET] Pokemon", key=key, ttl=3600)
             return pokemon
         except Exception as e:
             logger.error("Failed to fetch Pokemon", identifier=identifier, error=str(e))
@@ -153,7 +154,7 @@ class PokemonAPIClient:
         if cache is not None:
             cached_data = await cache.get(key)
             if cached_data is not None:
-                logger.info("Cache HIT — returning cached species", identifier=identifier)
+                logger.info("[CACHE HIT] Species", identifier=identifier, key=key)
                 return PokemonSpecies(**cached_data)
 
         logger.info("Fetching Pokemon species", identifier=identifier)
@@ -165,6 +166,7 @@ class PokemonAPIClient:
             )
             if cache is not None:
                 await cache.set(key, species.model_dump(mode="json"), ttl=3600)
+                logger.info("[CACHE SET] Species", key=key, ttl=3600)
             return species
         except Exception as e:
             logger.error(
@@ -182,7 +184,7 @@ class PokemonAPIClient:
         if cache is not None:
             cached_data = await cache.get(key)
             if cached_data is not None:
-                logger.info("Cache HIT — returning cached search", limit=limit, offset=offset)
+                logger.info("[CACHE HIT] Search", key=key, limit=limit, offset=offset)
                 return PokemonSearchResult(**cached_data)
 
         logger.info("Searching Pokemon", limit=limit, offset=offset)
@@ -196,6 +198,7 @@ class PokemonAPIClient:
             )
             if cache is not None:
                 await cache.set(key, result.model_dump(mode="json"), ttl=7200)
+                logger.info("[CACHE SET] Search", key=key, ttl=7200)
             return result
         except Exception as e:
             logger.error(
