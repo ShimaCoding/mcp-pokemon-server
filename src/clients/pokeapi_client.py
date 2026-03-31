@@ -258,7 +258,7 @@ class PokemonAPIClient:
             "Multiple Pokemon fetch completed",
             requested=len(identifiers),
             successful=len(pokemon_list),
-            failed=len(errors),
+            errors=len(errors),
         )
 
         return pokemon_list
