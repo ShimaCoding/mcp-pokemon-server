@@ -239,10 +239,16 @@ class EducationalPromptManager:
             "base_stat_total": sum(base_stats.values()) if base_stats else 0,
             "primary_abilities": ", ".join(abilities[:2]) if abilities else "Unknown",
             # Species-derived fields (populated when available)
-            "is_legendary": getattr(species_data, "is_legendary", False) if species_data else False,
-            "is_mythical": getattr(species_data, "is_mythical", False) if species_data else False,
+            "is_legendary": (
+                getattr(species_data, "is_legendary", False) if species_data else False
+            ),
+            "is_mythical": (
+                getattr(species_data, "is_mythical", False) if species_data else False
+            ),
             "generation": (
-                species_data.generation.get("name", "").replace("generation-", "").upper()
+                species_data.generation.get("name", "")
+                .replace("generation-", "")
+                .upper()
                 if species_data and species_data.generation
                 else ""
             ),
@@ -251,7 +257,9 @@ class EducationalPromptManager:
                 if species_data and species_data.habitat
                 else ""
             ),
-            "flavor_text": self._collect_flavor_text(species_data) if species_data else "",
+            "flavor_text": (
+                self._collect_flavor_text(species_data) if species_data else ""
+            ),
         }
 
     def _collect_flavor_text(self, species: Any) -> str:

@@ -14,7 +14,9 @@ class Settings(BaseSettings):
 
     # Uvicorn Configuration
     uvicorn_workers: int = Field(default=1, alias="UVICORN_WORKERS")
-    uvicorn_timeout_keep_alive: int = Field(default=30, alias="UVICORN_TIMEOUT_KEEP_ALIVE")
+    uvicorn_timeout_keep_alive: int = Field(
+        default=30, alias="UVICORN_TIMEOUT_KEEP_ALIVE"
+    )
     uvicorn_access_log: bool = Field(default=True, alias="UVICORN_ACCESS_LOG")
 
     # PokéAPI Configuration

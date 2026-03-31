@@ -187,8 +187,13 @@ class BattlePromptManager:
             )
 
             prompt_text = self._generate_matchup_analysis_prompt_text(
-                pokemon1_data, pokemon2_data, scenario, environment, context,
-                species1, species2,
+                pokemon1_data,
+                pokemon2_data,
+                scenario,
+                environment,
+                context,
+                species1,
+                species2,
             )
 
             return GetPromptResult(
@@ -620,12 +625,14 @@ Analysis Depth: {context["depth_description"]}
             s = species_map.get(name)
             if s:
                 status = (
-                    "Legendary" if s.is_legendary
-                    else "Mythical" if s.is_mythical
-                    else "Regular"
+                    "Legendary"
+                    if s.is_legendary
+                    else "Mythical" if s.is_mythical else "Regular"
                 )
                 gen_raw = s.generation.get("name", "")
-                generation = gen_raw.replace("generation-", "").upper() if gen_raw else "?"
+                generation = (
+                    gen_raw.replace("generation-", "").upper() if gen_raw else "?"
+                )
                 habitat = s.habitat["name"] if s.habitat else "unknown"
                 flavor = self._collect_flavor_text(s)
                 species_lines = (
@@ -644,7 +651,9 @@ Analysis Depth: {context["depth_description"]}
 
         return "\n".join(summaries)
 
-    def _create_pokemon_summary(self, pokemon_data: Any, species_data: Any | None = None) -> str:
+    def _create_pokemon_summary(
+        self, pokemon_data: Any, species_data: Any | None = None
+    ) -> str:
         """Create a summary for a single Pokemon, enriched with species data when available."""
         name = pokemon_data.name
         types = [ptype.type["name"] for ptype in pokemon_data.types]
@@ -672,13 +681,15 @@ Analysis Depth: {context["depth_description"]}
         species_section = ""
         if species_data:
             status = (
-                "Legendary" if species_data.is_legendary
-                else "Mythical" if species_data.is_mythical
-                else "Regular"
+                "Legendary"
+                if species_data.is_legendary
+                else "Mythical" if species_data.is_mythical else "Regular"
             )
             gen_raw = species_data.generation.get("name", "")
             generation = gen_raw.replace("generation-", "").upper() if gen_raw else "?"
-            habitat = species_data.habitat["name"] if species_data.habitat else "unknown"
+            habitat = (
+                species_data.habitat["name"] if species_data.habitat else "unknown"
+            )
             flavor = self._collect_flavor_text(species_data)
             species_section = (
                 f"\nStatus: {status} | Generation: {generation} | Habitat: {habitat}"
