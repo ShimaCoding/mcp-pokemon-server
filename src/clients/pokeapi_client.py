@@ -139,7 +139,7 @@ class PokemonAPIClient:
                 "Pokemon fetched successfully", name=pokemon.name, id=pokemon.id
             )
             if cache is not None:
-                await cache.set(key, pokemon.model_dump(), ttl=3600)
+                await cache.set(key, pokemon.model_dump(mode="json"), ttl=3600)
             return pokemon
         except Exception as e:
             logger.error("Failed to fetch Pokemon", identifier=identifier, error=str(e))
@@ -164,7 +164,7 @@ class PokemonAPIClient:
                 "Pokemon species fetched successfully", name=species.name, id=species.id
             )
             if cache is not None:
-                await cache.set(key, species.model_dump(), ttl=3600)
+                await cache.set(key, species.model_dump(mode="json"), ttl=3600)
             return species
         except Exception as e:
             logger.error(
@@ -195,7 +195,7 @@ class PokemonAPIClient:
                 returned=len(result.results),
             )
             if cache is not None:
-                await cache.set(key, result.model_dump(), ttl=7200)
+                await cache.set(key, result.model_dump(mode="json"), ttl=7200)
             return result
         except Exception as e:
             logger.error(
