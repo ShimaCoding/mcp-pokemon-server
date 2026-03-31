@@ -72,14 +72,14 @@ class PokemonAPIClient:
                 timeout=self.timeout,
                 limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             )
-            logger.info("PokéAPI client started", base_url=self.base_url)
+            logger.info("[POKEAPI] Client started", base_url=self.base_url)
 
     async def close(self) -> None:
         """Close the HTTP client."""
         if self.client:
             await self.client.aclose()
             self.client = None
-            logger.info("PokéAPI client closed")
+            logger.info("[POKEAPI] Client closed")
 
     @retry(
         stop=stop_after_attempt(3),
@@ -131,13 +131,11 @@ class PokemonAPIClient:
                 logger.info("[CACHE HIT] Pokemon", identifier=identifier, key=key)
                 return Pokemon(**cached_data)
 
-        logger.info("Fetching Pokemon", identifier=identifier)
+        logger.info("[POKEAPI] Fetching Pokemon", identifier=identifier)
         try:
             data = await self._make_request(f"pokemon/{identifier.lower()}")
             pokemon = Pokemon(**data)
-            logger.info(
-                "Pokemon fetched successfully", name=pokemon.name, id=pokemon.id
-            )
+            logger.info("[POKEAPI] Pokemon ready", name=pokemon.name, id=pokemon.id)
             if cache is not None:
                 await cache.set(key, pokemon.model_dump(mode="json"), ttl=3600)
                 logger.info("[CACHE SET] Pokemon", key=key, ttl=3600)
@@ -157,13 +155,11 @@ class PokemonAPIClient:
                 logger.info("[CACHE HIT] Species", identifier=identifier, key=key)
                 return PokemonSpecies(**cached_data)
 
-        logger.info("Fetching Pokemon species", identifier=identifier)
+        logger.info("[POKEAPI] Fetching species", identifier=identifier)
         try:
             data = await self._make_request(f"pokemon-species/{identifier.lower()}")
             species = PokemonSpecies(**data)
-            logger.info(
-                "Pokemon species fetched successfully", name=species.name, id=species.id
-            )
+            logger.info("[POKEAPI] Species ready", name=species.name, id=species.id)
             if cache is not None:
                 await cache.set(key, species.model_dump(mode="json"), ttl=3600)
                 logger.info("[CACHE SET] Species", key=key, ttl=3600)
@@ -187,12 +183,12 @@ class PokemonAPIClient:
                 logger.info("[CACHE HIT] Search", key=key, limit=limit, offset=offset)
                 return PokemonSearchResult(**cached_data)
 
-        logger.info("Searching Pokemon", limit=limit, offset=offset)
+        logger.info("[POKEAPI] Searching", limit=limit, offset=offset)
         try:
             data = await self._make_request(f"pokemon?limit={limit}&offset={offset}")
             result = PokemonSearchResult(**data)
             logger.info(
-                "Pokemon search successful",
+                "[POKEAPI] Search ready",
                 count=result.count,
                 returned=len(result.results),
             )
@@ -209,11 +205,11 @@ class PokemonAPIClient:
     @cached(ttl=86400, key_prefix="type")
     async def get_type_info(self, type_name: str) -> dict[str, Any]:
         """Get type information including effectiveness."""
-        logger.info("Fetching type info", type_name=type_name)
+        logger.info("[POKEAPI] Fetching type", type_name=type_name)
 
         try:
             data = await self._make_request(f"type/{type_name.lower()}")
-            logger.info("Type info fetched successfully", type_name=type_name)
+            logger.info("[POKEAPI] Type ready", type_name=type_name)
             return data
         except Exception as e:
             logger.error("Failed to fetch type info", type_name=type_name, error=str(e))
@@ -227,10 +223,10 @@ class PokemonAPIClient:
     async def get_evolution_chain(self, url_or_id: str) -> dict[str, Any]:
         """Get evolution chain by ID or full URL."""
         chain_id = url_or_id.strip("/").split("/")[-1]
-        logger.info("Fetching evolution chain", chain_id=chain_id)
+        logger.info("[POKEAPI] Fetching evolution chain", chain_id=chain_id)
         try:
             data = await self._make_request(f"evolution-chain/{chain_id}")
-            logger.info("Evolution chain fetched successfully", chain_id=chain_id)
+            logger.info("[POKEAPI] Evolution chain ready", chain_id=chain_id)
             return data
         except Exception as e:
             logger.error(
@@ -240,7 +236,7 @@ class PokemonAPIClient:
 
     async def get_multiple_pokemon(self, identifiers: list[str]) -> list[Pokemon]:
         """Get multiple Pokemon concurrently."""
-        logger.info("Fetching multiple Pokemon", count=len(identifiers))
+        logger.info("[POKEAPI] Fetching multiple", count=len(identifiers))
 
         tasks = [self.get_pokemon(identifier) for identifier in identifiers]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -258,7 +254,7 @@ class PokemonAPIClient:
             logger.warning("Some Pokemon failed to fetch", errors=errors)
 
         logger.info(
-            "Multiple Pokemon fetch completed",
+            "[POKEAPI] Multiple fetch done",
             requested=len(identifiers),
             successful=len(pokemon_list),
             errors=len(errors),

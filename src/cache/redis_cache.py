@@ -77,11 +77,11 @@ class RedisCache:
             # Test connection
             await self.client.ping()
             self._available = True
-            logger.info("Redis cache connected", redis_url=self.redis_url, db=self.db)
+            logger.info("[REDIS] Connected", redis_url=self.redis_url, db=self.db)
         except (RedisError, Exception) as e:
             self._available = False
             logger.warning(
-                "Redis cache unavailable, continuing without cache",
+                "[REDIS] Unavailable — skipping cache",
                 error=str(e),
                 redis_url=self.redis_url,
             )
@@ -92,7 +92,7 @@ class RedisCache:
             try:
                 await self.client.close()
                 self._available = False
-                logger.info("Redis cache closed")
+                logger.info("[REDIS] Closed")
             except Exception as e:
                 logger.error("Error closing Redis connection", error=str(e))
 

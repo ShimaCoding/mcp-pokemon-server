@@ -42,7 +42,7 @@ class PokemonResourceManager:
             "comparison": self._handle_pokemon_comparison,
         }
         logger.info(
-            "PokemonResourceManager initialized",
+            "[SERVER] ResourceManager ready",
             handlers=list(self.resource_handlers.keys()),
         )
 
@@ -109,7 +109,7 @@ class PokemonResourceManager:
             ValueError: If URI format is invalid
             Exception: If resource cannot be fetched
         """
-        logger.info("Getting resource", uri=uri)
+        logger.info("[RESOURCE] Fetching", uri=uri)
 
         try:
             # Parse the URI
@@ -142,9 +142,7 @@ class PokemonResourceManager:
 
             content = await handler(path_parts, query_params)
 
-            logger.info(
-                "Resource fetched successfully", uri=uri, content_length=len(content)
-            )
+            logger.info("[RESOURCE] Ready", uri=uri, content_length=len(content))
 
             return TextResourceContents(
                 uri=cast(AnyUrl, uri), mimeType="text/markdown", text=content

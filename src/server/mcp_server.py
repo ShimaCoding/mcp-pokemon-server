@@ -32,14 +32,14 @@ battle_prompts = BattlePromptManager(pokemon_client)
 @asynccontextmanager
 async def lifespan(server: FastMCP) -> AsyncGenerator[None, None]:
     """Manage server lifecycle: start and close the HTTP client and Redis cache."""
-    logger.info("Server startup: initializing PokéAPI client and Redis cache")
+    logger.info("[SERVER] Startup")
     await pokemon_client.start()
     set_pokemon_client(pokemon_client)  # share instance with tools
     await init_redis_cache(settings)
     try:
         yield
     finally:
-        logger.info("Server shutdown: closing PokéAPI client and Redis cache")
+        logger.info("[SERVER] Shutdown")
         set_pokemon_client(None)
         await close_redis_cache()
         await pokemon_client.close()
@@ -61,7 +61,7 @@ async def get_pokemon_info(name_or_id: str) -> str:
     Args:
         name_or_id: Pokemon name or ID to lookup
     """
-    logger.info("get_pokemon_info called", identifier=name_or_id)
+    logger.info("[TOOL] get_pokemon_info", identifier=name_or_id)
 
     try:
         result = await POKEMON_TOOLS["get_pokemon_info"](name_or_id)
@@ -70,7 +70,7 @@ async def get_pokemon_info(name_or_id: str) -> str:
         return str(result.content[0]["text"])
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        logger.error("get_pokemon_info failed", error=str(e))
+        logger.error("[TOOL] get_pokemon_info error", error=str(e))
         return error_msg
 
 
@@ -82,7 +82,7 @@ async def search_pokemon(limit: int = 20, offset: int = 0) -> str:
         limit: Maximum number of results (default: 20)
         offset: Offset for pagination (default: 0)
     """
-    logger.info("search_pokemon called", limit=limit, offset=offset)
+    logger.info("[TOOL] search_pokemon", limit=limit, offset=offset)
 
     try:
         result = await POKEMON_TOOLS["search_pokemon"](limit=limit, offset=offset)
@@ -91,7 +91,7 @@ async def search_pokemon(limit: int = 20, offset: int = 0) -> str:
         return str(result.content[0]["text"])
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        logger.error("search_pokemon failed", error=str(e))
+        logger.error("[TOOL] search_pokemon error", error=str(e))
         return error_msg
 
 
@@ -102,7 +102,7 @@ async def get_type_effectiveness(attacking_type: str) -> str:
     Args:
         attacking_type: The attacking type name (e.g., 'fire', 'water', 'electric')
     """
-    logger.info("get_type_effectiveness called", attacking_type=attacking_type)
+    logger.info("[TOOL] get_type_effectiveness", attacking_type=attacking_type)
 
     try:
         result = await POKEMON_TOOLS["get_type_effectiveness"](attacking_type)
@@ -111,7 +111,7 @@ async def get_type_effectiveness(attacking_type: str) -> str:
         return str(result.content[0]["text"])
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        logger.error("get_type_effectiveness failed", error=str(e))
+        logger.error("[TOOL] get_type_effectiveness error", error=str(e))
         return error_msg
 
 
@@ -122,7 +122,7 @@ async def analyze_pokemon_stats(name_or_id: str) -> str:
     Args:
         name_or_id: Pokemon name or ID to analyze
     """
-    logger.info("analyze_pokemon_stats called", identifier=name_or_id)
+    logger.info("[TOOL] analyze_pokemon_stats", identifier=name_or_id)
 
     try:
         result = await POKEMON_TOOLS["analyze_pokemon_stats"](name_or_id)
@@ -131,7 +131,7 @@ async def analyze_pokemon_stats(name_or_id: str) -> str:
         return str(result.content[0]["text"])
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        logger.error("analyze_pokemon_stats failed", error=str(e))
+        logger.error("[TOOL] analyze_pokemon_stats error", error=str(e))
         return error_msg
 
 
@@ -146,14 +146,14 @@ async def analyze_team(pokemon_names: list[str]) -> str:
     Args:
         pokemon_names: List of 2–6 Pokémon names or Pokédex IDs.
     """
-    logger.info("analyze_team called", team=pokemon_names)
+    logger.info("[TOOL] analyze_team", team=pokemon_names)
 
     try:
         result = await POKEMON_TOOLS["analyze_team"](pokemon_names)
         return str(result.content[0]["text"])
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        logger.error("analyze_team failed", error=str(e))
+        logger.error("[TOOL] analyze_team error", error=str(e))
         return error_msg
 
 
@@ -170,14 +170,14 @@ async def get_pokedex_entry(pokemon: str) -> str:
         pokemon: Pokémon name (e.g. 'pikachu') or Pokédex number (e.g. '25').
                  Alternate forms are supported (e.g. 'pikachu-alola').
     """
-    logger.info("get_pokedex_entry called", identifier=pokemon)
+    logger.info("[TOOL] get_pokedex_entry", identifier=pokemon)
 
     try:
         result = await POKEMON_TOOLS["get_pokedex_entry"](pokemon)
         return str(result.content[0]["text"])
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        logger.error("get_pokedex_entry failed", error=str(e))
+        logger.error("[TOOL] get_pokedex_entry error", error=str(e))
         return error_msg
 
 
@@ -189,14 +189,14 @@ async def pokemon_info_resource(name_or_id: str) -> str:
     Args:
         name_or_id: Pokemon name or ID to lookup
     """
-    logger.info("pokemon_info_resource called", identifier=name_or_id)
+    logger.info("[RESOURCE] pokemon://info", identifier=name_or_id)
 
     try:
         content = await resource_manager.get_resource(f"pokemon://info/{name_or_id}")
         return content.text
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        logger.error("pokemon_info_resource failed", error=str(e))
+        logger.error("[RESOURCE] pokemon://info error", error=str(e))
         return error_msg
 
 
@@ -207,14 +207,14 @@ async def pokemon_stats_resource(name_or_id: str) -> str:
     Args:
         name_or_id: Pokemon name or ID to analyze
     """
-    logger.info("pokemon_stats_resource called", identifier=name_or_id)
+    logger.info("[RESOURCE] pokemon://stats", identifier=name_or_id)
 
     try:
         content = await resource_manager.get_resource(f"pokemon://stats/{name_or_id}")
         return content.text
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        logger.error("pokemon_stats_resource failed", error=str(e))
+        logger.error("[RESOURCE] pokemon://stats error", error=str(e))
         return error_msg
 
 
@@ -225,14 +225,14 @@ async def pokemon_type_resource(type_name: str) -> str:
     Args:
         type_name: Pokemon type name (e.g., 'fire', 'water', 'electric')
     """
-    logger.info("pokemon_type_resource called", type_name=type_name)
+    logger.info("[RESOURCE] pokemon://type", type_name=type_name)
 
     try:
         content = await resource_manager.get_resource(f"pokemon://type/{type_name}")
         return content.text
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        logger.error("pokemon_type_resource failed", error=str(e))
+        logger.error("[RESOURCE] pokemon://type error", error=str(e))
         return error_msg
 
 
@@ -244,9 +244,7 @@ async def pokemon_comparison_resource(pokemon1: str, pokemon2: str) -> str:
         pokemon1: First Pokemon name
         pokemon2: Second Pokemon name
     """
-    logger.info(
-        "pokemon_comparison_resource called", pokemon1=pokemon1, pokemon2=pokemon2
-    )
+    logger.info("[RESOURCE] pokemon://comparison", pokemon1=pokemon1, pokemon2=pokemon2)
 
     try:
         content = await resource_manager.get_resource(
@@ -255,7 +253,7 @@ async def pokemon_comparison_resource(pokemon1: str, pokemon2: str) -> str:
         return content.text
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        logger.error("pokemon_comparison_resource failed", error=str(e))
+        logger.error("[RESOURCE] pokemon://comparison error", error=str(e))
         return error_msg
 
 
@@ -501,7 +499,7 @@ async def create_server() -> FastMCP:
 
 def run_server() -> None:
     """Run the MCP server."""
-    logger.info("Starting Pokemon MCP Server", transport=settings.transport)
+    logger.info("[SERVER] Starting", transport=settings.transport)
 
     try:
         if settings.transport == "stdio":

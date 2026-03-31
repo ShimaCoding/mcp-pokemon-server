@@ -20,8 +20,6 @@ async def get_pokemon_info(name_or_id: str) -> ToolResult:
     Returns:
         ToolResult with Pokemon information
     """
-    logger.info("Getting Pokemon info", identifier=name_or_id)
-
     try:
         client = await get_pokemon_client()
         pokemon = await client.get_pokemon(name_or_id)
@@ -89,8 +87,6 @@ async def search_pokemon(
     Returns:
         ToolResult with search results
     """
-    logger.info("Searching Pokemon", query=query, limit=limit, offset=offset)
-
     try:
         client = await get_pokemon_client()
         search_result = await client.search_pokemon(limit=limit, offset=offset)
@@ -133,8 +129,6 @@ async def get_type_effectiveness(attacking_type: str) -> ToolResult:
     Returns:
         ToolResult with type effectiveness information
     """
-    logger.info("Getting type effectiveness", attacking_type=attacking_type)
-
     try:
         client = await get_pokemon_client()
         type_data = await client.get_type_info(attacking_type)
@@ -199,8 +193,6 @@ async def analyze_pokemon_stats(name_or_id: str) -> ToolResult:
     Returns:
         ToolResult with stats analysis
     """
-    logger.info("Analyzing Pokemon stats", identifier=name_or_id)
-
     try:
         client = await get_pokemon_client()
         pokemon = await client.get_pokemon(name_or_id)
@@ -379,8 +371,6 @@ async def get_pokedex_entry(name_or_id: str) -> ToolResult:
         ToolResult whose text content is a JSON object with the full Pokédex
         entry, or an error message on failure.
     """
-    logger.info("Fetching Pokédex entry", identifier=name_or_id)
-
     try:
         client = await get_pokemon_client()
 
@@ -525,8 +515,6 @@ async def analyze_team(pokemon_names: list[str]) -> ToolResult:
         ToolResult whose text content is a JSON object with the full team
         analysis, or an error message on failure.
     """
-    logger.info("Analyzing team", team=pokemon_names, size=len(pokemon_names))
-
     if not 2 <= len(pokemon_names) <= 6:
         return ToolResult(
             content=[
