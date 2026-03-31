@@ -32,6 +32,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "structlog>=23.0.0",
     "tenacity>=8.0.0",
+    "redis>=4.6.0",
     "uvicorn[standard]>=0.30.0",
 ]
 

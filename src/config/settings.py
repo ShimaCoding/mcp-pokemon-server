@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL")
     redis_db: int = Field(default=0, alias="REDIS_DB")
     redis_password: str | None = Field(default=None, alias="REDIS_PASSWORD")
+    redis_enabled: bool = Field(default=True, alias="REDIS_ENABLED")
+    cache_bypass_errors: bool = Field(default=True, alias="CACHE_BYPASS_ERRORS")
 
     # Logging Configuration
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

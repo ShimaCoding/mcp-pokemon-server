@@ -15,6 +15,11 @@ services:
       - POKEAPI_BASE_URL=https://pokeapi.co/api/v2
       - PYTHONPATH=/app
       - PYTEST_CACHE_DIR=/tmp/.pytest_cache
+      - REDIS_URL=redis://redis:6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=dev_redis_secret
+      - REDIS_ENABLED=true
     volumes:
       - .:/app
       - ./logs:/app/logs
@@ -23,9 +28,31 @@ services:
       - /app/.mypy_cache
     networks:
       - mcp-network
+    depends_on:
+      redis:
+        condition: service_healthy
     working_dir: /app
     command: python -m src.main
+
+  redis:
+    image: redis:7-alpine
+    container_name: mcp-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --requirepass dev_redis_secret
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "dev_redis_secret", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - mcp-network
 
 networks:
   mcp-network:
     driver: bridge
+

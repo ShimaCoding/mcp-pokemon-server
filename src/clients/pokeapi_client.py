@@ -12,6 +12,8 @@ from tenacity import (
     wait_exponential,
 )
 
+from ..cache.decorators import cached
+from ..cache.redis_cache import get_redis_cache
 from ..config.logging import get_logger
 from ..config.settings import get_settings
 from ..models.pokemon_models import Pokemon, PokemonSearchResult, PokemonSpecies
@@ -120,14 +122,24 @@ class PokemonAPIClient:
 
     async def get_pokemon(self, identifier: str) -> Pokemon:
         """Get Pokemon by name or ID."""
-        logger.info("Fetching Pokemon", identifier=identifier)
+        key = f"pokemon:{identifier.lower()}"
+        cache = get_redis_cache()
 
+        if cache is not None:
+            cached_data = await cache.get(key)
+            if cached_data is not None:
+                logger.info("Cache HIT — returning cached Pokemon", identifier=identifier)
+                return Pokemon(**cached_data)
+
+        logger.info("Fetching Pokemon", identifier=identifier)
         try:
             data = await self._make_request(f"pokemon/{identifier.lower()}")
             pokemon = Pokemon(**data)
             logger.info(
                 "Pokemon fetched successfully", name=pokemon.name, id=pokemon.id
             )
+            if cache is not None:
+                await cache.set(key, pokemon.model_dump(), ttl=3600)
             return pokemon
         except Exception as e:
             logger.error("Failed to fetch Pokemon", identifier=identifier, error=str(e))
@@ -135,14 +147,24 @@ class PokemonAPIClient:
 
     async def get_pokemon_species(self, identifier: str) -> PokemonSpecies:
         """Get Pokemon species by name or ID."""
-        logger.info("Fetching Pokemon species", identifier=identifier)
+        key = f"species:{identifier.lower()}"
+        cache = get_redis_cache()
 
+        if cache is not None:
+            cached_data = await cache.get(key)
+            if cached_data is not None:
+                logger.info("Cache HIT — returning cached species", identifier=identifier)
+                return PokemonSpecies(**cached_data)
+
+        logger.info("Fetching Pokemon species", identifier=identifier)
         try:
             data = await self._make_request(f"pokemon-species/{identifier.lower()}")
             species = PokemonSpecies(**data)
             logger.info(
                 "Pokemon species fetched successfully", name=species.name, id=species.id
             )
+            if cache is not None:
+                await cache.set(key, species.model_dump(), ttl=3600)
             return species
         except Exception as e:
             logger.error(
@@ -154,8 +176,16 @@ class PokemonAPIClient:
         self, limit: int = 20, offset: int = 0
     ) -> PokemonSearchResult:
         """Search Pokemon with pagination."""
-        logger.info("Searching Pokemon", limit=limit, offset=offset)
+        key = f"search:{limit}:{offset}"
+        cache = get_redis_cache()
 
+        if cache is not None:
+            cached_data = await cache.get(key)
+            if cached_data is not None:
+                logger.info("Cache HIT — returning cached search", limit=limit, offset=offset)
+                return PokemonSearchResult(**cached_data)
+
+        logger.info("Searching Pokemon", limit=limit, offset=offset)
         try:
             data = await self._make_request(f"pokemon?limit={limit}&offset={offset}")
             result = PokemonSearchResult(**data)
@@ -164,6 +194,8 @@ class PokemonAPIClient:
                 count=result.count,
                 returned=len(result.results),
             )
+            if cache is not None:
+                await cache.set(key, result.model_dump(), ttl=7200)
             return result
         except Exception as e:
             logger.error(
@@ -171,6 +203,7 @@ class PokemonAPIClient:
             )
             raise
 
+    @cached(ttl=86400, key_prefix="type")
     async def get_type_info(self, type_name: str) -> dict[str, Any]:
         """Get type information including effectiveness."""
         logger.info("Fetching type info", type_name=type_name)
@@ -187,6 +220,7 @@ class PokemonAPIClient:
         """Alias for get_type_info for consistency with resource manager."""
         return await self.get_type_info(type_name)
 
+    @cached(ttl=86400, key_prefix="evolution")
     async def get_evolution_chain(self, url_or_id: str) -> dict[str, Any]:
         """Get evolution chain by ID or full URL."""
         chain_id = url_or_id.strip("/").split("/")[-1]
