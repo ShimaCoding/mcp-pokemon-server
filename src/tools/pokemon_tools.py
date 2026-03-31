@@ -1,6 +1,7 @@
 """Basic Pokemon tools for MCP server."""
 
 import json
+from collections import Counter
 from typing import Any
 
 from ..clients.pokeapi_client import PokemonNotFoundError, get_pokemon_client
@@ -337,6 +338,29 @@ def _flatten_chain(node: dict) -> list[dict]:
     return result
 
 
+def _determine_roles(stats: dict[str, int]) -> list[str]:
+    """Return the battle roles for a Pokémon given its base stats."""
+    roles = []
+    if stats.get("speed", 0) >= 100:
+        roles.append("Fast")
+    if stats.get("attack", 0) >= 100 or stats.get("special-attack", 0) >= 100:
+        roles.append("Attacker")
+    if stats.get("defense", 0) >= 100 or stats.get("special-defense", 0) >= 100:
+        roles.append("Tank")
+    if stats.get("hp", 0) >= 90:
+        roles.append("Bulky")
+    return roles or ["Balanced"]
+
+
+def _bulk_score(stats: dict[str, int]) -> float:
+    """Composite bulk: HP × (DEF + SPDEF) / 100."""
+    return (
+        stats.get("hp", 0)
+        * (stats.get("defense", 0) + stats.get("special-defense", 0))
+        / 100
+    )
+
+
 async def get_pokedex_entry(name_or_id: str) -> ToolResult:
     """Fetch a complete Pokédex entry for a Pokémon.
 
@@ -409,6 +433,27 @@ async def get_pokedex_entry(name_or_id: str) -> ToolResult:
         except Exception:
             logger.warning("Failed to fetch evolution chain", identifier=name_or_id)
 
+    # Enrich evolution stages with stats fetched in parallel — graceful
+    if evolution_stages:
+        try:
+            stage_names = [s["name"] for s in evolution_stages if s.get("name")]
+            stage_pokemon = await client.get_multiple_pokemon(stage_names)
+            stats_by_name = {
+                p.name: {
+                    "id": p.id,
+                    "types": [
+                        t.type["name"] for t in sorted(p.types, key=lambda x: x.slot)
+                    ],
+                    "total_bst": sum(s.base_stat for s in p.stats),
+                }
+                for p in stage_pokemon
+            }
+            for stage in evolution_stages:
+                if stage["name"] in stats_by_name:
+                    stage.update(stats_by_name[stage["name"]])
+        except Exception:
+            logger.warning("Failed to enrich evolution stages", identifier=name_or_id)
+
     # Types ordered by slot
     types = [t.type["name"] for t in sorted(pokemon.types, key=lambda x: x.slot)]
 
@@ -466,6 +511,126 @@ async def get_pokedex_entry(name_or_id: str) -> ToolResult:
     )
 
 
+async def analyze_team(pokemon_names: list[str]) -> ToolResult:
+    """Analyze a team of 2–6 Pokémon fetched in parallel.
+
+    Fetches all Pokémon concurrently and returns a JSON object with per-member
+    data (types, base stats, BST, battle roles) plus team-wide metrics: average
+    BST, type coverage, fastest/strongest/bulkiest members, and role distribution.
+
+    Args:
+        pokemon_names: List of 2–6 Pokémon names or Pokédex IDs.
+
+    Returns:
+        ToolResult whose text content is a JSON object with the full team
+        analysis, or an error message on failure.
+    """
+    logger.info("Analyzing team", team=pokemon_names, size=len(pokemon_names))
+
+    if not 2 <= len(pokemon_names) <= 6:
+        return ToolResult(
+            content=[
+                {
+                    "type": "text",
+                    "text": "❌ A team must have between 2 and 6 Pokémon.",
+                }
+            ],
+            is_error=True,
+        )
+
+    try:
+        client = await get_pokemon_client()
+        team = await client.get_multiple_pokemon(
+            [str(n).lower() for n in pokemon_names]
+        )
+    except Exception as e:
+        logger.error("Error fetching team", error=str(e))
+        return ToolResult(
+            content=[{"type": "text", "text": f"❌ Error fetching team: {str(e)}"}],
+            is_error=True,
+        )
+
+    if not team:
+        return ToolResult(
+            content=[
+                {
+                    "type": "text",
+                    "text": "❌ Could not fetch any Pokémon from the provided names.",
+                }
+            ],
+            is_error=True,
+        )
+
+    members: list[dict[str, Any]] = []
+    for p in team:
+        stats = {s.stat["name"]: s.base_stat for s in p.stats}
+        members.append(
+            {
+                "name": p.name,
+                "id": p.id,
+                "types": [
+                    t.type["name"] for t in sorted(p.types, key=lambda x: x.slot)
+                ],
+                "base_stats": stats,
+                "total_bst": sum(stats.values()),
+                "roles": _determine_roles(stats),
+            }
+        )
+
+    # Team-wide metrics
+    avg_bst = sum(m["total_bst"] for m in members) / len(members)
+    type_coverage = sorted({t for m in members for t in m["types"]})
+
+    fastest = max(members, key=lambda m: m["base_stats"].get("speed", 0))
+    strongest_physical = max(members, key=lambda m: m["base_stats"].get("attack", 0))
+    strongest_special = max(
+        members, key=lambda m: m["base_stats"].get("special-attack", 0)
+    )
+    bulkiest = max(members, key=lambda m: _bulk_score(m["base_stats"]))
+    role_distribution = dict(Counter(r for m in members for r in m["roles"]))
+
+    # Flag names that were requested but not returned (e.g. typos)
+    fetched_names = {m["name"] for m in members}
+    not_found = [
+        n for n in [str(x).lower() for x in pokemon_names] if n not in fetched_names
+    ]
+
+    analysis: dict[str, Any] = {
+        "team_size": len(members),
+        "members": members,
+        "team_analysis": {
+            "avg_bst": round(avg_bst, 1),
+            "type_coverage": type_coverage,
+            "fastest": {
+                "name": fastest["name"],
+                "speed": fastest["base_stats"].get("speed", 0),
+            },
+            "strongest_physical": {
+                "name": strongest_physical["name"],
+                "attack": strongest_physical["base_stats"].get("attack", 0),
+            },
+            "strongest_special": {
+                "name": strongest_special["name"],
+                "special_attack": strongest_special["base_stats"].get(
+                    "special-attack", 0
+                ),
+            },
+            "bulkiest": {
+                "name": bulkiest["name"],
+                "bulk_score": round(_bulk_score(bulkiest["base_stats"]), 1),
+            },
+            "role_distribution": role_distribution,
+        },
+    }
+
+    if not_found:
+        analysis["not_found"] = not_found
+
+    return ToolResult(
+        content=[{"type": "text", "text": json.dumps(analysis, ensure_ascii=False)}]
+    )
+
+
 # Tool registry for easy access
 POKEMON_TOOLS = {
     "get_pokemon_info": get_pokemon_info,
@@ -473,4 +638,5 @@ POKEMON_TOOLS = {
     "get_type_effectiveness": get_type_effectiveness,
     "analyze_pokemon_stats": analyze_pokemon_stats,
     "get_pokedex_entry": get_pokedex_entry,
+    "analyze_team": analyze_team,
 }

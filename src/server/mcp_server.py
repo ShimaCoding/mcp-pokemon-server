@@ -131,6 +131,28 @@ async def analyze_pokemon_stats(name_or_id: str) -> str:
 
 
 @app.tool()
+async def analyze_team(pokemon_names: list[str]) -> str:
+    """Analyze a team of 2–6 Pokémon fetched in parallel.
+
+    Returns a JSON object with per-member data (types, base stats, BST, battle
+    roles) plus team-wide metrics: average BST, type coverage, fastest/
+    strongest/bulkiest members, and role distribution.
+
+    Args:
+        pokemon_names: List of 2–6 Pokémon names or Pokédex IDs.
+    """
+    logger.info("analyze_team called", team=pokemon_names)
+
+    try:
+        result = await POKEMON_TOOLS["analyze_team"](pokemon_names)
+        return str(result.content[0]["text"])
+    except Exception as e:
+        error_msg = f"❌ Error: {str(e)}"
+        logger.error("analyze_team failed", error=str(e))
+        return error_msg
+
+
+@app.tool()
 async def get_pokedex_entry(pokemon: str) -> str:
     """Get a complete Pokédex entry for a Pokémon, including flavor texts.
 

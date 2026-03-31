@@ -15,6 +15,7 @@ from src.models.pokemon_models import (
 )
 from src.tools.pokemon_tools import (
     analyze_pokemon_stats,
+    analyze_team,
     get_pokedex_entry,
     get_pokemon_info,
     get_type_effectiveness,
@@ -356,12 +357,40 @@ async def test_get_pokedex_entry_success(sample_pokemon_with_species, sample_spe
     """Test successful Pokédex entry retrieval with full JSON output."""
     import json
 
+    def _make_stage_pokemon(
+        pid: int, name: str, type_name: str, total_bst: int
+    ) -> Pokemon:
+        """Minimal Pokemon for evolution stage enrichment."""
+        return Pokemon(
+            id=pid,
+            name=name,
+            height=4,
+            weight=60,
+            types=[PokemonType(slot=1, type={"name": type_name, "url": ""})],
+            stats=[
+                PokemonStat(
+                    base_stat=total_bst,
+                    effort=0,
+                    stat={"name": "hp", "url": ""},
+                )
+            ],
+            abilities=[],
+            sprites=PokemonSprites(),
+        )
+
     with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
         mock_api_client = AsyncMock()
         mock_api_client.get_pokemon.return_value = sample_pokemon_with_species
         mock_api_client.get_pokemon_species.return_value = sample_species
         mock_api_client.get_evolution_chain = AsyncMock(
             return_value=SAMPLE_EVOLUTION_CHAIN
+        )
+        mock_api_client.get_multiple_pokemon = AsyncMock(
+            return_value=[
+                _make_stage_pokemon(172, "pichu", "electric", 205),
+                _make_stage_pokemon(25, "pikachu", "electric", 320),
+                _make_stage_pokemon(26, "raichu", "electric", 485),
+            ]
         )
         mock_client.return_value = mock_api_client
 
@@ -397,7 +426,7 @@ async def test_get_pokedex_entry_success(sample_pokemon_with_species, sample_spe
         assert data["growth_rate"] == "medium"
         assert data["egg_groups"] == ["field", "fairy"]
 
-        # Evolution chain
+        # Evolution chain — structure
         chain = data["evolution_chain"]
         assert chain is not None
         assert chain[0]["name"] == "pichu"
@@ -408,6 +437,14 @@ async def test_get_pokedex_entry_success(sample_pokemon_with_species, sample_spe
         assert chain[2]["name"] == "raichu"
         assert chain[2]["via"]["trigger"] == "use-item"
         assert chain[2]["via"]["item"] == "thunder-stone"
+        # Evolution chain — enrichment (id, types, total_bst per stage)
+        assert chain[0]["id"] == 172
+        assert chain[0]["types"] == ["electric"]
+        assert chain[0]["total_bst"] == 205
+        assert chain[1]["id"] == 25
+        assert chain[1]["total_bst"] == 320
+        assert chain[2]["id"] == 26
+        assert chain[2]["total_bst"] == 485
 
 
 @pytest.mark.asyncio
@@ -497,3 +534,131 @@ async def test_get_pokedex_entry_fallback_to_english(sample_pokemon_with_species
         assert len(data["flavor_text"]) == 1
         assert "electric pouches" in data["flavor_text"][0]
         assert data["evolution_chain"] is None  # no evolution_chain URL in species
+
+
+# ---------------------------------------------------------------------------
+# analyze_team tests
+# ---------------------------------------------------------------------------
+
+
+def _make_pokemon(
+    pid: int,
+    name: str,
+    type_name: str,
+    hp: int,
+    attack: int,
+    defense: int,
+    sp_atk: int,
+    sp_def: int,
+    speed: int,
+) -> Pokemon:
+    """Build a minimal Pokemon for analyze_team tests."""
+    stats = [
+        ("hp", hp),
+        ("attack", attack),
+        ("defense", defense),
+        ("special-attack", sp_atk),
+        ("special-defense", sp_def),
+        ("speed", speed),
+    ]
+    return Pokemon(
+        id=pid,
+        name=name,
+        height=10,
+        weight=100,
+        types=[PokemonType(slot=1, type={"name": type_name, "url": ""})],
+        stats=[
+            PokemonStat(base_stat=v, effort=0, stat={"name": n, "url": ""})
+            for n, v in stats
+        ],
+        abilities=[],
+        sprites=PokemonSprites(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_analyze_team_success():
+    """Test successful team analysis with 3 Pokémon."""
+    import json
+
+    charizard = _make_pokemon(6, "charizard", "fire", 78, 84, 78, 109, 85, 100)
+    blastoise = _make_pokemon(9, "blastoise", "water", 79, 83, 100, 85, 105, 78)
+    venusaur = _make_pokemon(3, "venusaur", "grass", 80, 82, 83, 100, 100, 80)
+
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        mock_api_client = AsyncMock()
+        mock_api_client.get_multiple_pokemon = AsyncMock(
+            return_value=[charizard, blastoise, venusaur]
+        )
+        mock_client.return_value = mock_api_client
+
+        result = await analyze_team(["charizard", "blastoise", "venusaur"])
+
+        assert not result.is_error
+        data = json.loads(result.content[0]["text"])
+
+        assert data["team_size"] == 3
+        assert len(data["members"]) == 3
+
+        # Per-member fields
+        names = [m["name"] for m in data["members"]]
+        assert "charizard" in names
+        assert "blastoise" in names
+
+        charizard_entry = next(m for m in data["members"] if m["name"] == "charizard")
+        assert charizard_entry["types"] == ["fire"]
+        assert charizard_entry["total_bst"] == 534  # 78+84+78+109+85+100
+        assert "Fast" in charizard_entry["roles"]  # speed=100
+
+        blastoise_entry = next(m for m in data["members"] if m["name"] == "blastoise")
+        assert "Tank" in blastoise_entry["roles"]  # defense=100
+
+        # Team analysis
+        ta = data["team_analysis"]
+        assert set(ta["type_coverage"]) == {"fire", "water", "grass"}
+        assert ta["fastest"]["name"] == "charizard"
+        assert ta["fastest"]["speed"] == 100
+        assert ta["strongest_special"]["name"] == "charizard"  # sp_atk=109
+        assert ta["bulkiest"]["name"] == "blastoise"  # 79*(100+105)/100 = 161.95
+        assert "Fast" in ta["role_distribution"]
+        assert "Tank" in ta["role_distribution"]
+
+        # No unknown Pokémon
+        assert "not_found" not in data
+
+
+@pytest.mark.asyncio
+async def test_analyze_team_too_few():
+    """Test that fewer than 2 Pokémon returns an error."""
+    result = await analyze_team(["pikachu"])
+    assert result.is_error
+    assert "between 2 and 6" in result.content[0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_analyze_team_too_many():
+    """Test that more than 6 Pokémon returns an error."""
+    result = await analyze_team(["a", "b", "c", "d", "e", "f", "g"])
+    assert result.is_error
+    assert "between 2 and 6" in result.content[0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_analyze_team_partial_failure():
+    """Pokémon not found by get_multiple_pokemon appear in not_found."""
+    import json
+
+    pikachu = _make_pokemon(25, "pikachu", "electric", 35, 55, 40, 50, 50, 90)
+
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        mock_api_client = AsyncMock()
+        # Only pikachu returned — fakemon silently dropped by get_multiple_pokemon
+        mock_api_client.get_multiple_pokemon = AsyncMock(return_value=[pikachu])
+        mock_client.return_value = mock_api_client
+
+        result = await analyze_team(["pikachu", "fakemon"])
+
+        assert not result.is_error
+        data = json.loads(result.content[0]["text"])
+        assert data["team_size"] == 1
+        assert "fakemon" in data["not_found"]
