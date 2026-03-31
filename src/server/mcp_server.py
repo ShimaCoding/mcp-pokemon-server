@@ -8,7 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import GetPromptResult, PromptMessage, TextContent
 
 from ..cache.redis_cache import close_redis_cache, init_redis_cache
-from ..clients.pokeapi_client import PokemonAPIClient
+from ..clients.pokeapi_client import PokemonAPIClient, set_pokemon_client
 from ..config.logging import get_logger, setup_logging
 from ..config.settings import get_settings
 from ..prompts.battle_prompts import BattlePromptManager
@@ -34,11 +34,13 @@ async def lifespan(server: FastMCP) -> AsyncGenerator[None, None]:
     """Manage server lifecycle: start and close the HTTP client and Redis cache."""
     logger.info("Server startup: initializing PokéAPI client and Redis cache")
     await pokemon_client.start()
+    set_pokemon_client(pokemon_client)  # share instance with tools
     await init_redis_cache(settings)
     try:
         yield
     finally:
         logger.info("Server shutdown: closing PokéAPI client and Redis cache")
+        set_pokemon_client(None)
         await close_redis_cache()
         await pokemon_client.close()
 

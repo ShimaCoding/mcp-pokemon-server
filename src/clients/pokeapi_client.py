@@ -268,6 +268,12 @@ class PokemonAPIClient:
 _client: PokemonAPIClient | None = None
 
 
+def set_pokemon_client(client: "PokemonAPIClient | None") -> None:
+    """Register an existing client as the global instance used by tools."""
+    global _client
+    _client = client
+
+
 async def get_pokemon_client() -> PokemonAPIClient:
     """Get or create the global Pokemon API client."""
     global _client
