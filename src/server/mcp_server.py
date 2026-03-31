@@ -1,7 +1,6 @@
 """MCP server implementation using FastMCP."""
 
 import logging
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 

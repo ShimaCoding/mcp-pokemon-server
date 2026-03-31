@@ -184,6 +184,7 @@ async def test_tool_error_handling():
 # get_pokedex_entry tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def sample_pokemon_with_species():
     """Pikachu Pokemon model with species URL populated."""
@@ -217,7 +218,10 @@ def sample_pokemon_with_species():
         ],
         abilities=[
             PokemonAbility(
-                ability={"name": "static", "url": "https://pokeapi.co/api/v2/ability/9/"},
+                ability={
+                    "name": "static",
+                    "url": "https://pokeapi.co/api/v2/ability/9/",
+                },
                 is_hidden=False,
                 slot=1,
             )
@@ -228,6 +232,76 @@ def sample_pokemon_with_species():
     )
 
 
+SAMPLE_EVOLUTION_CHAIN = {
+    "id": 10,
+    "chain": {
+        "is_baby": True,
+        "species": {
+            "name": "pichu",
+            "url": "https://pokeapi.co/api/v2/pokemon-species/172/",
+        },
+        "evolution_details": [],
+        "evolves_to": [
+            {
+                "is_baby": False,
+                "species": {
+                    "name": "pikachu",
+                    "url": "https://pokeapi.co/api/v2/pokemon-species/25/",
+                },
+                "evolution_details": [
+                    {
+                        "trigger": {"name": "level-up", "url": ""},
+                        "min_happiness": 220,
+                        "gender": None,
+                        "held_item": None,
+                        "item": None,
+                        "known_move": None,
+                        "known_move_type": None,
+                        "location": None,
+                        "min_affection": None,
+                        "min_beauty": None,
+                        "min_level": None,
+                        "needs_overworld_rain": False,
+                        "relative_physical_stats": None,
+                        "time_of_day": "",
+                        "turn_upside_down": False,
+                    }
+                ],
+                "evolves_to": [
+                    {
+                        "is_baby": False,
+                        "species": {
+                            "name": "raichu",
+                            "url": "https://pokeapi.co/api/v2/pokemon-species/26/",
+                        },
+                        "evolution_details": [
+                            {
+                                "trigger": {"name": "use-item", "url": ""},
+                                "item": {"name": "thunder-stone", "url": ""},
+                                "gender": None,
+                                "held_item": None,
+                                "known_move": None,
+                                "known_move_type": None,
+                                "location": None,
+                                "min_affection": None,
+                                "min_beauty": None,
+                                "min_happiness": None,
+                                "min_level": None,
+                                "needs_overworld_rain": False,
+                                "relative_physical_stats": None,
+                                "time_of_day": "",
+                                "turn_upside_down": False,
+                            }
+                        ],
+                        "evolves_to": [],
+                    }
+                ],
+            }
+        ],
+    },
+}
+
+
 @pytest.fixture
 def sample_species():
     """Pikachu PokemonSpecies model."""
@@ -235,20 +309,42 @@ def sample_species():
         id=25,
         name="pikachu",
         color={"name": "yellow", "url": "https://pokeapi.co/api/v2/pokemon-color/10/"},
-        generation={"name": "generation-i", "url": "https://pokeapi.co/api/v2/generation/1/"},
-        habitat={"name": "forest", "url": "https://pokeapi.co/api/v2/pokemon-habitat/4/"},
+        generation={
+            "name": "generation-i",
+            "url": "https://pokeapi.co/api/v2/generation/1/",
+        },
+        habitat={
+            "name": "forest",
+            "url": "https://pokeapi.co/api/v2/pokemon-habitat/4/",
+        },
         is_legendary=False,
         is_mythical=False,
         capture_rate=190,
+        genera=[
+            {"genus": "Ratón eléctrico", "language": {"name": "es", "url": ""}},
+            {"genus": "Mouse Pokémon", "language": {"name": "en", "url": ""}},
+        ],
+        gender_rate=4,
+        base_happiness=70,
+        growth_rate={"name": "medium", "url": ""},
+        egg_groups=[{"name": "field", "url": ""}, {"name": "fairy", "url": ""}],
+        shape={"name": "quadruped", "url": ""},
+        evolution_chain={"url": "https://pokeapi.co/api/v2/evolution-chain/10/"},
         flavor_text_entries=[
             {
                 "flavor_text": "Cuando varios de estos POKEMON se juntan, su electricidad puede provocar tormentas.",
-                "language": {"name": "es", "url": "https://pokeapi.co/api/v2/language/7/"},
+                "language": {
+                    "name": "es",
+                    "url": "https://pokeapi.co/api/v2/language/7/",
+                },
                 "version": {"name": "x", "url": ""},
             },
             {
                 "flavor_text": "When several of these POKéMON gather, their electricity can cause lightning storms.",
-                "language": {"name": "en", "url": "https://pokeapi.co/api/v2/language/9/"},
+                "language": {
+                    "name": "en",
+                    "url": "https://pokeapi.co/api/v2/language/9/",
+                },
                 "version": {"name": "x", "url": ""},
             },
         ],
@@ -264,6 +360,9 @@ async def test_get_pokedex_entry_success(sample_pokemon_with_species, sample_spe
         mock_api_client = AsyncMock()
         mock_api_client.get_pokemon.return_value = sample_pokemon_with_species
         mock_api_client.get_pokemon_species.return_value = sample_species
+        mock_api_client.get_evolution_chain = AsyncMock(
+            return_value=SAMPLE_EVOLUTION_CHAIN
+        )
         mock_client.return_value = mock_api_client
 
         result = await get_pokedex_entry("pikachu")
@@ -271,6 +370,7 @@ async def test_get_pokedex_entry_success(sample_pokemon_with_species, sample_spe
         assert not result.is_error
         data = json.loads(result.content[0]["text"])
 
+        # Core fields
         assert data["id"] == 25
         assert data["name"] == "pikachu"
         assert data["types"] == ["electric"]
@@ -287,6 +387,50 @@ async def test_get_pokedex_entry_success(sample_pokemon_with_species, sample_spe
         assert "POKEMON" in data["flavor_text"][0]
         # Species resolution uses the URL, not the pokemon id
         mock_api_client.get_pokemon_species.assert_called_once_with("25")
+
+        # New narrative fields from species
+        assert data["genus"] == "Ratón eléctrico"
+        assert data["color"] == "yellow"
+        assert data["shape"] == "quadruped"
+        assert data["gender_rate"] == 4
+        assert data["base_happiness"] == 70
+        assert data["growth_rate"] == "medium"
+        assert data["egg_groups"] == ["field", "fairy"]
+
+        # Evolution chain
+        chain = data["evolution_chain"]
+        assert chain is not None
+        assert chain[0]["name"] == "pichu"
+        assert chain[0]["is_baby"] is True
+        assert chain[1]["name"] == "pikachu"
+        assert chain[1]["via"]["trigger"] == "level-up"
+        assert chain[1]["via"]["min_happiness"] == 220
+        assert chain[2]["name"] == "raichu"
+        assert chain[2]["via"]["trigger"] == "use-item"
+        assert chain[2]["via"]["item"] == "thunder-stone"
+
+
+@pytest.mark.asyncio
+async def test_get_pokedex_entry_evolution_chain_failure_is_graceful(
+    sample_pokemon_with_species, sample_species
+):
+    """Evolution chain fetch failure must not fail the whole call."""
+    import json
+
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        mock_api_client = AsyncMock()
+        mock_api_client.get_pokemon.return_value = sample_pokemon_with_species
+        mock_api_client.get_pokemon_species.return_value = sample_species
+        mock_api_client.get_evolution_chain = AsyncMock(
+            side_effect=Exception("timeout")
+        )
+        mock_client.return_value = mock_api_client
+
+        result = await get_pokedex_entry("pikachu")
+
+        assert not result.is_error
+        data = json.loads(result.content[0]["text"])
+        assert data["evolution_chain"] is None
 
 
 @pytest.mark.asyncio
@@ -330,6 +474,7 @@ async def test_get_pokedex_entry_fallback_to_english(sample_pokemon_with_species
         is_legendary=False,
         is_mythical=False,
         capture_rate=190,
+        # No evolution_chain → chain fetch skipped, evolution_chain=null in output
         flavor_text_entries=[
             {
                 "flavor_text": "It can generate electric attacks from the electric pouches located in both of its cheeks.",
@@ -351,3 +496,4 @@ async def test_get_pokedex_entry_fallback_to_english(sample_pokemon_with_species
         data = json.loads(result.content[0]["text"])
         assert len(data["flavor_text"]) == 1
         assert "electric pouches" in data["flavor_text"][0]
+        assert data["evolution_chain"] is None  # no evolution_chain URL in species

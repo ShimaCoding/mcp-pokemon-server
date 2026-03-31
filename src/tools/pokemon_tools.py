@@ -1,6 +1,7 @@
 """Basic Pokemon tools for MCP server."""
 
 import json
+from typing import Any
 
 from ..clients.pokeapi_client import PokemonNotFoundError, get_pokemon_client
 from ..config.logging import get_logger
@@ -258,12 +259,92 @@ async def analyze_pokemon_stats(name_or_id: str) -> ToolResult:
         return ToolResult(content=error_content, is_error=True)
 
 
+def _collect_texts(entries: list[dict], lang: str, max_count: int = 3) -> list[str]:
+    """Return up to *max_count* deduplicated flavor texts for *lang*."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for entry in entries:
+        if entry["language"]["name"] == lang:
+            text = entry["flavor_text"].replace("\f", " ").replace("\n", " ").strip()
+            if text and text not in seen:
+                seen.add(text)
+                result.append(text)
+                if len(result) == max_count:
+                    break
+    return result
+
+
+def _get_genus(genera: list[dict], lang: str) -> str:
+    """Return the Pokémon classification string for *lang* (e.g. 'Mouse Pokémon')."""
+    for entry in genera:
+        if entry.get("language", {}).get("name") == lang:
+            return str(entry.get("genus", ""))
+    return ""
+
+
+def _parse_evolution_details(details: list[dict]) -> dict[str, Any]:
+    """Extract non-null evolution conditions from the first details entry."""
+    if not details:
+        return {}
+    d = details[0]
+    via: dict[str, Any] = {"trigger": d.get("trigger", {}).get("name", "unknown")}
+    if d.get("min_level"):
+        via["min_level"] = d["min_level"]
+    if d.get("min_happiness"):
+        via["min_happiness"] = d["min_happiness"]
+    if d.get("item"):
+        via["item"] = d["item"]["name"]
+    if d.get("held_item"):
+        via["held_item"] = d["held_item"]["name"]
+    if d.get("location"):
+        via["location"] = d["location"]["name"]
+    if d.get("known_move"):
+        via["known_move"] = d["known_move"]["name"]
+    if d.get("known_move_type"):
+        via["known_move_type"] = d["known_move_type"]["name"]
+    gender = d.get("gender")
+    if gender is not None:
+        via["gender"] = "female" if gender == 1 else "male"
+    if d.get("time_of_day"):
+        via["time_of_day"] = d["time_of_day"]
+    if d.get("min_beauty"):
+        via["min_beauty"] = d["min_beauty"]
+    if d.get("min_affection"):
+        via["min_affection"] = d["min_affection"]
+    if d.get("needs_overworld_rain"):
+        via["needs_overworld_rain"] = True
+    if d.get("turn_upside_down"):
+        via["turn_upside_down"] = True
+    relative_stats = d.get("relative_physical_stats")
+    if relative_stats is not None:
+        via["relative_physical_stats"] = relative_stats
+    return via
+
+
+def _flatten_chain(node: dict) -> list[dict]:
+    """Recursively flatten a chain node into an ordered list of evolution stages."""
+    entry: dict[str, Any] = {"name": node.get("species", {}).get("name", "")}
+    if node.get("is_baby"):
+        entry["is_baby"] = True
+    evo_details = node.get("evolution_details")
+    if evo_details:
+        via = _parse_evolution_details(evo_details)
+        if via:
+            entry["via"] = via
+    result = [entry]
+    for child in node.get("evolves_to", []):
+        result.extend(_flatten_chain(child))
+    return result
+
+
 async def get_pokedex_entry(name_or_id: str) -> ToolResult:
     """Fetch a complete Pokédex entry for a Pokémon.
 
     Retrieves types, base stats, abilities, height, weight, flavor text
     descriptions from the games (in Spanish when available, otherwise English),
-    generation, habitat, legendary/mythical status, and capture rate.
+    generation, habitat, legendary/mythical status, capture rate, genus
+    classification, gender ratio, base happiness, growth rate, egg groups,
+    body shape, color, and full evolution chain with conditions.
 
     Args:
         name_or_id: Pokemon name (lowercase, e.g. 'pikachu') or Pokédex number
@@ -304,7 +385,9 @@ async def get_pokedex_entry(name_or_id: str) -> ToolResult:
             is_error=True,
         )
     except Exception as e:
-        logger.error("Error fetching Pokédex entry", identifier=name_or_id, error=str(e))
+        logger.error(
+            "Error fetching Pokédex entry", identifier=name_or_id, error=str(e)
+        )
         return ToolResult(
             content=[
                 {
@@ -315,11 +398,19 @@ async def get_pokedex_entry(name_or_id: str) -> ToolResult:
             is_error=True,
         )
 
+    # Fetch evolution chain — graceful, never fails the whole call
+    evolution_stages: list[dict] | None = None
+    if species.evolution_chain and species.evolution_chain.get("url"):
+        try:
+            chain_data = await client.get_evolution_chain(
+                species.evolution_chain["url"]
+            )
+            evolution_stages = _flatten_chain(chain_data.get("chain", {}))
+        except Exception:
+            logger.warning("Failed to fetch evolution chain", identifier=name_or_id)
+
     # Types ordered by slot
-    types = [
-        t.type["name"]
-        for t in sorted(pokemon.types, key=lambda x: x.slot)
-    ]
+    types = [t.type["name"] for t in sorted(pokemon.types, key=lambda x: x.slot)]
 
     # Base stats as a plain dict
     base_stats = {s.stat["name"]: s.base_stat for s in pokemon.stats}
@@ -330,48 +421,44 @@ async def get_pokedex_entry(name_or_id: str) -> ToolResult:
         for a in sorted(pokemon.abilities, key=lambda x: x.slot)
     ]
 
-    # Flavor texts: prefer Spanish, fall back to English; deduplicate; cap at 3
-    def _collect_texts(lang: str) -> list[str]:
-        seen: set[str] = set()
-        result: list[str] = []
-        for entry in species.flavor_text_entries or []:
-            if entry["language"]["name"] == lang:
-                text = (
-                    entry["flavor_text"]
-                    .replace("\f", " ")
-                    .replace("\n", " ")
-                    .strip()
-                )
-                if text and text not in seen:
-                    seen.add(text)
-                    result.append(text)
-                    if len(result) == 3:
-                        break
-        return result
-
-    flavor_texts = _collect_texts("es") or _collect_texts("en")
+    # Flavor texts: prefer Spanish, fall back to English; deduplicated; max 3
+    flavor_entries = species.flavor_text_entries or []
+    flavor_texts = _collect_texts(flavor_entries, "es") or _collect_texts(
+        flavor_entries, "en"
+    )
 
     # Generation: "generation-i" → "I"
     generation_raw = species.generation.get("name", "")
-    generation = generation_raw.replace("generation-", "").upper() if generation_raw else "unknown"
-
-    # Habitat
-    habitat = species.habitat["name"] if species.habitat else "unknown"
+    generation = (
+        generation_raw.replace("generation-", "").upper()
+        if generation_raw
+        else "unknown"
+    )
 
     entry = {
         "id": pokemon.id,
         "name": pokemon.name,
+        "genus": _get_genus(species.genera, "es")
+        or _get_genus(species.genera, "en")
+        or None,
         "height_dm": pokemon.height,
         "weight_hg": pokemon.weight,
+        "color": species.color.get("name") if species.color else None,
+        "shape": species.shape.get("name") if species.shape else None,
         "types": types,
         "base_stats": base_stats,
         "abilities": abilities,
         "flavor_text": flavor_texts,
         "generation": generation,
-        "habitat": habitat,
+        "habitat": species.habitat["name"] if species.habitat else "unknown",
         "is_legendary": species.is_legendary,
         "is_mythical": species.is_mythical,
         "capture_rate": species.capture_rate,
+        "gender_rate": species.gender_rate,
+        "base_happiness": species.base_happiness,
+        "growth_rate": species.growth_rate.get("name") if species.growth_rate else None,
+        "egg_groups": [g["name"] for g in species.egg_groups],
+        "evolution_chain": evolution_stages,
     }
 
     return ToolResult(

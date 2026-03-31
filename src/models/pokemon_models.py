@@ -57,7 +57,9 @@ class Pokemon(BaseModel):
     abilities: list[PokemonAbility]
     sprites: PokemonSprites
     moves: list[PokemonMove] | None = None
-    species: dict[str, str] | None = None  # name and url, used to resolve species for alternate forms
+    species: dict[str, str] | None = (
+        None  # name and url, used to resolve species for alternate forms
+    )
 
     @property
     def height_meters(self) -> float:
@@ -92,6 +94,14 @@ class PokemonSpecies(BaseModel):
     is_mythical: bool
     capture_rate: int | None = None
     flavor_text_entries: list[dict[str, Any]] | None = None
+    # Narrative-enrichment fields
+    genera: list[dict[str, Any]] = Field(default_factory=list)
+    gender_rate: int = -1  # -1 = genderless; 0–8 scale (female_pct = rate/8*100)
+    base_happiness: int | None = None
+    growth_rate: dict[str, str] = Field(default_factory=dict)
+    egg_groups: list[dict[str, str]] = Field(default_factory=list)
+    shape: dict[str, str] | None = None
+    evolution_chain: dict[str, str] | None = None  # {"url": "..."}
 
 
 class TypeEffectiveness(BaseModel):

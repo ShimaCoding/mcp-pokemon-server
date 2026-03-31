@@ -1,6 +1,6 @@
 """Response models for MCP tools."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from .pokemon_models import Pokemon, PokemonTeam
 
 
-class ResponseStatus(str, Enum):
+class ResponseStatus(StrEnum):
     """Response status enumeration."""
 
     SUCCESS = "success"

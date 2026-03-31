@@ -187,6 +187,20 @@ class PokemonAPIClient:
         """Alias for get_type_info for consistency with resource manager."""
         return await self.get_type_info(type_name)
 
+    async def get_evolution_chain(self, url_or_id: str) -> dict[str, Any]:
+        """Get evolution chain by ID or full URL."""
+        chain_id = url_or_id.strip("/").split("/")[-1]
+        logger.info("Fetching evolution chain", chain_id=chain_id)
+        try:
+            data = await self._make_request(f"evolution-chain/{chain_id}")
+            logger.info("Evolution chain fetched successfully", chain_id=chain_id)
+            return data
+        except Exception as e:
+            logger.error(
+                "Failed to fetch evolution chain", chain_id=chain_id, error=str(e)
+            )
+            raise
+
     async def get_multiple_pokemon(self, identifiers: list[str]) -> list[Pokemon]:
         """Get multiple Pokemon concurrently."""
         logger.info("Fetching multiple Pokemon", count=len(identifiers))
