@@ -71,7 +71,10 @@ class RedisCache:
                 connection_url = self.redis_url
 
             self.client = redis_async.from_url(
-                connection_url, db=self.db, decode_responses=True, socket_connect_timeout=5
+                connection_url,
+                db=self.db,
+                decode_responses=True,
+                socket_connect_timeout=5,
             )
 
             # Test connection
@@ -123,9 +126,7 @@ class RedisCache:
             logger.warning("Cache GET error", key=key, error=str(e))
             return None
 
-    async def set(
-        self, key: str, value: Any, ttl: int | None = None
-    ) -> bool:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
         """Set value in cache.
 
         Args:
@@ -141,9 +142,7 @@ class RedisCache:
 
         try:
             serialized = json.dumps(value)
-            await self.client.setex(
-                key, ttl or 3600, serialized
-            )  # Default TTL: 1 hour
+            await self.client.setex(key, ttl or 3600, serialized)  # Default TTL: 1 hour
             logger.debug("Cache SET", key=key, ttl=ttl)
             return True
         except (RedisError, json.JSONDecodeError) as e:

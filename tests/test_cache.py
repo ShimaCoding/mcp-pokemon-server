@@ -69,7 +69,9 @@ class TestRedisCacheInit:
 class TestRedisCacheStart:
     async def test_start_success(self, redis_cache: RedisCache) -> None:
         mock_redis = AsyncMock()
-        with patch("src.cache.redis_cache.redis_async.from_url", return_value=mock_redis):
+        with patch(
+            "src.cache.redis_cache.redis_async.from_url", return_value=mock_redis
+        ):
             await redis_cache.start()
         assert redis_cache._available is True
         mock_redis.ping.assert_called_once()
@@ -90,7 +92,9 @@ class TestRedisCacheStart:
         """If ping fails, cache is unavailable but no exception."""
         mock_redis = AsyncMock()
         mock_redis.ping.side_effect = Exception("Ping failed")
-        with patch("src.cache.redis_cache.redis_async.from_url", return_value=mock_redis):
+        with patch(
+            "src.cache.redis_cache.redis_async.from_url", return_value=mock_redis
+        ):
             await redis_cache.start()
 
         assert redis_cache._available is False
@@ -122,15 +126,11 @@ class TestRedisCacheGet:
         assert available_cache.metrics.misses == 1
         assert available_cache.metrics.hits == 0
 
-    async def test_get_unavailable_returns_none(
-        self, redis_cache: RedisCache
-    ) -> None:
+    async def test_get_unavailable_returns_none(self, redis_cache: RedisCache) -> None:
         result = await redis_cache.get("pokemon:pikachu")
         assert result is None
 
-    async def test_get_redis_error_graceful(
-        self, available_cache: RedisCache
-    ) -> None:
+    async def test_get_redis_error_graceful(self, available_cache: RedisCache) -> None:
         available_cache.client.get.side_effect = RedisError("Redis error")  # type: ignore[union-attr]
         result = await available_cache.get("pokemon:pikachu")
         assert result is None
@@ -140,13 +140,13 @@ class TestRedisCacheGet:
 class TestRedisCacheSet:
     async def test_set_success(self, available_cache: RedisCache) -> None:
         available_cache.client.setex.return_value = True  # type: ignore[union-attr]
-        result = await available_cache.set("pokemon:pikachu", {"name": "pikachu"}, ttl=3600)
+        result = await available_cache.set(
+            "pokemon:pikachu", {"name": "pikachu"}, ttl=3600
+        )
         assert result is True
         available_cache.client.setex.assert_called_once()  # type: ignore[union-attr]
 
-    async def test_set_unavailable_returns_false(
-        self, redis_cache: RedisCache
-    ) -> None:
+    async def test_set_unavailable_returns_false(self, redis_cache: RedisCache) -> None:
         result = await redis_cache.set("key", {"data": "value"})
         assert result is False
 
@@ -238,6 +238,7 @@ class TestCachedDecorator:
     async def test_decorator_fallback_when_cache_unavailable(self) -> None:
         """Decorator executes original function when cache is unavailable."""
         with patch("src.cache.redis_cache._cache", None):
+
             class FakeClient:
                 @cached(ttl=60, key_prefix="test")
                 async def fetch(self, name: str) -> dict:

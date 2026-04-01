@@ -8,4 +8,10 @@ from .redis_cache import (
     init_redis_cache,
 )
 
-__all__ = ["RedisCache", "get_redis_cache", "init_redis_cache", "close_redis_cache", "cached"]
+__all__ = [
+    "RedisCache",
+    "get_redis_cache",
+    "init_redis_cache",
+    "close_redis_cache",
+    "cached",
+]
