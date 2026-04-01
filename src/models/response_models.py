@@ -76,6 +76,7 @@ class ToolResult(BaseModel):
 
     content: list[dict[str, Any]]
     is_error: bool = False
+    elicit: dict[str, Any] | None = None  # For interactive elicitation
 
 
 class ResourceContent(BaseModel):
