@@ -109,18 +109,45 @@ claude mcp add --transport http MCPokedex https://mcp.mcpokedex.com/mcp
 ```bash
 git clone https://github.com/ShimaCoding/mcp-pokemon-server
 cd mcp-pokemon-server
+
+# Opción 1: Con Make (Linux/Mac)
+make dev
+
+# Opción 2: Con docker-compose (Windows/Mac/Linux)
 docker-compose up --build
 ```
 
-El servidor quedará disponible en `http://localhost:8000/mcp`.
+El servidor quedará disponible en `http://localhost:8001/mcp` (desarrollo) o `http://localhost:8000/mcp` (producción).
 
 ### Sin Docker
 
 ```bash
-python -m venv venv && source venv/bin/activate
-pip install -e .
-python -m src.main
+pip install -e ".[dev]"
+make run-local         # Stdio transport
+make run-uvicorn       # HTTP transport en http://localhost:8000
 ```
+
+---
+
+## Comandos Útiles (Makefile)
+
+| Comando | Descripción |
+|---------|-------------|
+| `make dev` | Build y ejecuta desarrollo con live reload |
+| `make prod` | Build y ejecuta producción con Redis |
+| `make run-dev` | Ejecuta contenedor de desarrollo |
+| `make run-local` | Ejecuta servidor localmente (stdio) |
+| `make run-uvicorn` | Ejecuta con uvicorn en http://localhost:8000 |
+| `make test` | Ejecuta tests en Docker |
+| `make test-local` | Ejecuta tests localmente |
+| `make logs-dev` | Muestra logs del desarrollo en vivo |
+| `make health` | Verifica salud del servidor |
+| `make status` | Muestra estado de contenedores |
+| `make stop` | Detiene todos los contenedores |
+| `make clean` | Limpia recursos Docker |
+| `make install-dev` | Instala dependencias localmente |
+| `make restart` | Reinicia contenedor de desarrollo |
+| `make help` | Lista todos los comandos disponibles |
 
 ---
 
