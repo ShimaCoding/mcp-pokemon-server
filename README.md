@@ -17,6 +17,7 @@ Servidor MCP en producción construido con **FastMCP** y **PokéAPI**. Expone he
 | `get_type_effectiveness` | Tabla de efectividades de un tipo atacante |
 | `analyze_pokemon_stats` | Análisis de stats base con rating automático (Legendary / Strong / Average / Below Average) |
 | `get_pokedex_entry` | Entrada completa de la Pokédex: flavor text en español, generación, hábitat, captura, legendario/mítico |
+| `analyze_team` | Análisis completo de un equipo de 2-6 Pokémon: coverage de tipos, miembros más rápidos/fuertes/tankys, distribución de roles |
 
 ### Prompts
 
@@ -35,8 +36,18 @@ Servidor MCP en producción construido con **FastMCP** y **PokéAPI**. Expone he
 |--------------|-------------|
 | `pokemon://info/{name_or_id}` | Información detallada como recurso |
 | `pokemon://stats/{name_or_id}` | Estadísticas y análisis como recurso |
+| `pokemon://moveset/{name_or_id}` | Moveset completo y métodos de aprendizaje |
 | `pokemon://type/{type_name}` | Efectividades de tipo como recurso |
-| `pokemon://comparison/{pokemon1}/{pokemon2}` | Comparativa entre dos Pokémon |
+| `pokemon://generation/{gen_number}` | Lista de todos los Pokémon de una generación específica |
+| `pokemon://comparison/{pokemon1_name}/{pokemon2_name}` | Comparativa detallada entre dos Pokémon |
+
+---
+
+## 📚 Ejemplos de Uso
+
+Para ejemplos prácticos y detallados sobre cómo usar cada herramienta, prompt y resource, consulta:
+
+👉 **[EJEMPLOS_MCP_POKEMON.md](EJEMPLOS_MCP_POKEMON.md)** — Guía completa con casos de uso reales, combinaciones avanzadas y best practices.
 
 ---
 
@@ -60,17 +71,33 @@ async with streamablehttp_client(MCP_SERVER_URL) as (read, write, _):
         tools = await session.list_tools()
 ```
 
+
+**Desde Claude**
+
+```
+claude mcp add --transport http MCPokedex https://mcp.mcpokedex.com/mcp
+```
+
 **Desde Claude Desktop (`claude_desktop_config.json`):**
 
 ```json
 {
   "mcpServers": {
-    "pokemon": {
+    "MCPokedex": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://mcpokedex.com/mcp"]
+      "args": ["-y", "mcp-remote", "https://mcp.mcpokedex.com/mcp"]
     }
   }
 }
+```
+
+```json
+**Desde VS Code
+
+		"MCPokedex": {
+			"url": "https://mcp.mcpokedex.com/mcp",
+			"type": "http"
+		}
 ```
 
 ---
