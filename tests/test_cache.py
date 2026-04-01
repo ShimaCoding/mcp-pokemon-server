@@ -1,6 +1,6 @@
 """Tests for the Redis cache module."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from redis.exceptions import RedisError
