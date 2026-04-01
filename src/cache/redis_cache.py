@@ -1,7 +1,7 @@
 """Redis cache client with async support and graceful degradation."""
 
 import json
-from typing import Any
+from typing import Any, cast
 
 import redis.asyncio as redis_async
 from redis.asyncio import Redis
@@ -55,7 +55,7 @@ class RedisCache:
         self.redis_url = redis_url
         self.db = db
         self.password = password
-        self.client: Redis[str] | None = None
+        self.client: Redis | None = None
         self.metrics = CacheMetrics()
         self._available = False
 
@@ -78,8 +78,9 @@ class RedisCache:
             )
 
             # Test connection
-            await self.client.ping()
-            self._available = True
+            result = await self.client.ping()  # type: ignore[misc]
+            if result:
+                self._available = True
             logger.info("[REDIS] Connected", redis_url=self.redis_url, db=self.db)
         except (RedisError, Exception) as e:
             self._available = False
@@ -164,8 +165,9 @@ class RedisCache:
 
         try:
             result = await self.client.delete(key)
-            logger.debug("Cache DELETE", key=key, deleted=result > 0)
-            return result > 0
+            deleted = cast(int, result) > 0
+            logger.debug("Cache DELETE", key=key, deleted=deleted)
+            return deleted
         except (RedisError, Exception) as e:
             self.metrics.errors += 1
             logger.warning("Cache DELETE error", key=key, error=str(e))
@@ -185,7 +187,7 @@ class RedisCache:
 
         try:
             result = await self.client.exists(key)
-            return result > 0
+            return cast(int, result) > 0
         except (RedisError, Exception) as e:
             logger.warning("Cache EXISTS error", key=key, error=str(e))
             return False
