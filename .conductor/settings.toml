@@ -1,0 +1,22 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+setup = "uv sync --extra dev --extra test"
+run_mode = "concurrent"
+
+# Redis is optional: without it the server logs a warning and runs uncached.
+[scripts.run.mcp]
+available_in = [ "local" ]
+command = "MCP_TRANSPORT=streamable-http MCP_SERVER_HOST=127.0.0.1 MCP_SERVER_PORT=$CONDUCTOR_PORT uv run python -m src.main"
+default = true
+icon = "play"
+
+# Inspector UI/proxy on CONDUCTOR_PORT+1/+2 so concurrent workspaces don't clash.
+[scripts.run.inspector]
+available_in = [ "local" ]
+command = "CLIENT_PORT=$((CONDUCTOR_PORT + 1)) SERVER_PORT=$((CONDUCTOR_PORT + 2)) npx -y @modelcontextprotocol/inspector"
+icon = "search"
+
+[scripts.run.test]
+command = "uv run pytest"
+icon = "test-tube"

@@ -127,6 +127,30 @@ make run-local         # Stdio transport
 make run-uvicorn       # HTTP transport en http://localhost:8000
 ```
 
+### Con Conductor
+
+El repo incluye `.conductor/settings.toml`, así que cada workspace de [Conductor](https://conductor.build) queda listo sin pasos manuales:
+
+| Script | Qué hace |
+|--------|----------|
+| `setup` | `uv sync --extra dev --extra test` (instala desde `uv.lock`) |
+| `mcp` (default) | Servidor streamable-http en `http://127.0.0.1:$CONDUCTOR_PORT/mcp` |
+| `inspector` | MCP Inspector en `http://127.0.0.1:$((CONDUCTOR_PORT + 1))` |
+| `test` | `uv run pytest` |
+
+`run_mode = "concurrent"`: cada workspace usa sus propios puertos, así que puedes tener varios servidores levantados a la vez. Redis es opcional: si no está corriendo, el servidor lo registra como warning y sigue funcionando sin caché.
+
+#### Conectar el agente (pokemon-agent)
+
+1. En el workspace de este repo, ejecuta el script `mcp` y anota el puerto (`$CONDUCTOR_PORT`, visible en la URL que imprime uvicorn).
+2. En el workspace de [pokemon-agent](https://github.com/ShimaCoding/pokemon-agent), pon en su `.env`:
+
+   ```bash
+   MCP_SERVER_URL=http://127.0.0.1:<puerto>/mcp
+   ```
+
+3. Reinicia el agente para que tome la nueva URL.
+
 ---
 
 ## Comandos Útiles (Makefile)
