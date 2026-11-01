@@ -76,6 +76,9 @@ class ToolResult(BaseModel):
 
     content: list[dict[str, Any]]
     is_error: bool = False
+    # Payload for MCP Apps widgets (`structuredContent`); the text content stays
+    # the LLM-facing representation.
+    structured_content: dict[str, Any] | None = None
 
 
 class ResourceContent(BaseModel):

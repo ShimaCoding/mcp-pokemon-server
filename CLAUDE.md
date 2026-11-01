@@ -43,7 +43,7 @@ make stop && make clean          # Stop and remove everything
 
 The server uses **FastMCP** to expose three MCP primitives:
 
-- **Tools** (`src/tools/pokemon_tools.py`): 4 callable tools — `get_pokemon_info`, `search_pokemon`, `get_type_effectiveness`, `analyze_pokemon_stats`
+- **Tools** (`src/tools/pokemon_tools.py`): 7 callable tools — `get_pokemon_info`, `search_pokemon`, `get_type_effectiveness`, `analyze_pokemon_stats`, `analyze_team`, `get_pokedex_entry`, `compare_pokemon`
 - **Resources** (`src/resources/pokemon_resources.py`): Dynamic URI patterns — `pokemon://info/{name}`, `pokemon://stats/{name}`, `pokemon://type/{type}`, `pokemon://comparison/{name1}/{name2}`
 - **Prompts** (`src/prompts/`): 6 prompt templates split into educational (`educational_prompts.py`) and battle strategy (`battle_prompts.py`)
 
@@ -54,6 +54,14 @@ All tools and resources call through `PokemonAPIClient` (`src/clients/pokeapi_cl
 **Data models** (`src/models/`): Pydantic v2 models for Pokemon, stats, types, abilities, sprites, moves, and search results. `ToolResult` wraps all MCP tool responses.
 
 **Configuration** (`src/config/settings.py`): Pydantic settings loaded from environment variables. Key vars: `MCP_SERVER_HOST`, `MCP_SERVER_PORT`, `MCP_TRANSPORT` (stdio or streamable-http), `LOG_LEVEL`, `REDIS_PASSWORD`.
+
+## MCP Apps (widgets)
+
+The server uses the SDK's `mcp.server.apps.Apps` extension. `get_pokemon_info` / `get_pokedex_entry` are bound to `ui://pokedex/card.html` and `analyze_pokemon_stats` / `compare_pokemon` to `ui://pokedex/stats.html`. These tools return a `CallToolResult`: text content for the LLM plus `structuredContent` for the widget (`pokemon_card()` / `stats_entry()` in `pokemon_tools.py`).
+
+- UI-bound tools (`@apps.tool`) must be declared **before** `MCPServer(extensions=[apps])` is constructed; the extension is consumed at construction time.
+- Widget sources live in `widgets/` (Vite + TS + `vite-plugin-singlefile`, runtime `@modelcontextprotocol/ext-apps`). `make widgets` builds them into `src/widgets/html/*.html`, which **is committed** so the Python image needs no Node. Rebuild and commit after editing widget sources.
+- Widget HTML must stay self-contained: the host iframe CSP only allows `raw.githubusercontent.com` (sprites) as an external origin.
 
 ## Transport
 

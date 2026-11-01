@@ -87,6 +87,12 @@ test-local: ## Run tests locally (without Docker)
 	@printf "$(BLUE)[INFO]$(NC) Running tests locally...\n"
 	@python -m pytest tests/
 
+# MCP Apps widgets
+.PHONY: widgets
+widgets: ## Build the MCP Apps widgets into src/widgets/html (requires Node)
+	@printf "$(BLUE)[INFO]$(NC) Building widgets...\n"
+	@cd widgets && npm ci && npm run build
+
 # Shell targets
 .PHONY: shell
 shell: check-docker ## Open shell in production container

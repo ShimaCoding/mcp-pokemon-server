@@ -78,3 +78,6 @@ PROJECT_STATUS.md
 
 # MCP generated
 mcp-pokemon-server/
+
+# MCP Apps widget sources (built HTML lives in src/widgets/html)
+widgets/node_modules

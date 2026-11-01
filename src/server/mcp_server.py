@@ -4,18 +4,22 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from mcp.server.apps import Apps
 from mcp.server.mcpserver import MCPServer
-from mcp.types import GetPromptResult, PromptMessage, TextContent
+from mcp.server.mcpserver.prompts.base import Message, UserMessage
+from mcp.types import CallToolResult, GetPromptResult, TextContent
 
 from .. import __version__
 from ..cache.redis_cache import close_redis_cache, init_redis_cache
 from ..clients.pokeapi_client import PokemonAPIClient, set_pokemon_client
 from ..config.logging import get_logger, setup_logging
 from ..config.settings import get_settings
+from ..models.response_models import ToolResult
 from ..prompts.battle_prompts import BattlePromptManager
 from ..prompts.educational_prompts import EducationalPromptManager
 from ..resources.pokemon_resources import PokemonResourceManager
 from ..tools.pokemon_tools import POKEMON_TOOLS
+from ..widgets import CARD_URI, STATS_URI, register_widgets
 
 # Setup logging
 setup_logging()
@@ -46,16 +50,34 @@ async def lifespan(server: MCPServer) -> AsyncGenerator[None, None]:
         await pokemon_client.close()
 
 
-# Create MCP server instance (host/port are transport options in SDK v2, see run_server)
-app = MCPServer(
-    "Pokemon MCP Server",
-    version=__version__,
-    lifespan=lifespan,
-)
+# MCP Apps: tools bound to a `ui://` widget still return LLM-facing text, plus a
+# `structuredContent` payload the host hands to the widget.
+apps = Apps()
+register_widgets(apps)
 
 
-@app.tool()
-async def get_pokemon_info(name_or_id: str) -> str:
+def _call_tool_result(result: ToolResult) -> CallToolResult:
+    return CallToolResult(
+        content=[TextContent(type="text", text=str(c["text"])) for c in result.content],
+        structured_content=result.structured_content,
+        is_error=result.is_error,
+    )
+
+
+def _tool_error(tool: str, e: Exception) -> CallToolResult:
+    logger.error(f"[TOOL] {tool} error", error=str(e))
+    return CallToolResult(
+        content=[TextContent(type="text", text=f"❌ Error: {str(e)}")], is_error=True
+    )
+
+
+def _prompt_messages(result: GetPromptResult) -> list[Message]:
+    return [Message(m.content, role=m.role) for m in result.messages]
+
+
+# UI-bound tools must be declared before MCPServer consumes the extension.
+@apps.tool(resource_uri=CARD_URI)
+async def get_pokemon_info(name_or_id: str) -> CallToolResult:
     """Get detailed information about a Pokemon by name or ID.
 
     Args:
@@ -64,14 +86,74 @@ async def get_pokemon_info(name_or_id: str) -> str:
     logger.info("[TOOL] get_pokemon_info", identifier=name_or_id)
 
     try:
-        result = await POKEMON_TOOLS["get_pokemon_info"](name_or_id)
-        if result.is_error:
-            return str(result.content[0]["text"])
-        return str(result.content[0]["text"])
+        return _call_tool_result(await POKEMON_TOOLS["get_pokemon_info"](name_or_id))
     except Exception as e:
-        error_msg = f"❌ Error: {str(e)}"
-        logger.error("[TOOL] get_pokemon_info error", error=str(e))
-        return error_msg
+        return _tool_error("get_pokemon_info", e)
+
+
+@apps.tool(resource_uri=STATS_URI)
+async def analyze_pokemon_stats(name_or_id: str) -> CallToolResult:
+    """Analyze Pokemon stats and provide insights.
+
+    Args:
+        name_or_id: Pokemon name or ID to analyze
+    """
+    logger.info("[TOOL] analyze_pokemon_stats", identifier=name_or_id)
+
+    try:
+        return _call_tool_result(
+            await POKEMON_TOOLS["analyze_pokemon_stats"](name_or_id)
+        )
+    except Exception as e:
+        return _tool_error("analyze_pokemon_stats", e)
+
+
+@apps.tool(resource_uri=CARD_URI)
+async def get_pokedex_entry(pokemon: str) -> CallToolResult:
+    """Get a complete Pokédex entry for a Pokémon, including flavor texts.
+
+    Returns a JSON object with types, base stats, abilities, height, weight,
+    flavor text descriptions (Spanish preferred, English fallback), generation,
+    habitat, legendary/mythical status, and capture rate. Ideal for narration
+    by the Dexter persona.
+
+    Args:
+        pokemon: Pokémon name (e.g. 'pikachu') or Pokédex number (e.g. '25').
+                 Alternate forms are supported (e.g. 'pikachu-alola').
+    """
+    logger.info("[TOOL] get_pokedex_entry", identifier=pokemon)
+
+    try:
+        return _call_tool_result(await POKEMON_TOOLS["get_pokedex_entry"](pokemon))
+    except Exception as e:
+        return _tool_error("get_pokedex_entry", e)
+
+
+@apps.tool(resource_uri=STATS_URI)
+async def compare_pokemon(pokemon_names: list[str]) -> CallToolResult:
+    """Compare the base stats of 2–6 Pokémon side by side.
+
+    Returns a markdown table with HP, Attack, Defense, Sp. Atk, Sp. Def, Speed
+    and total for each Pokémon, plus which one leads each stat.
+
+    Args:
+        pokemon_names: List of 2–6 Pokémon names or Pokédex IDs.
+    """
+    logger.info("[TOOL] compare_pokemon", pokemon=pokemon_names)
+
+    try:
+        return _call_tool_result(await POKEMON_TOOLS["compare_pokemon"](pokemon_names))
+    except Exception as e:
+        return _tool_error("compare_pokemon", e)
+
+
+# Create MCP server instance (host/port are transport options in SDK v2, see run_server)
+app = MCPServer(
+    "Pokemon MCP Server",
+    version=__version__,
+    lifespan=lifespan,
+    extensions=[apps],
+)
 
 
 @app.tool()
@@ -116,26 +198,6 @@ async def get_type_effectiveness(attacking_type: str) -> str:
 
 
 @app.tool()
-async def analyze_pokemon_stats(name_or_id: str) -> str:
-    """Analyze Pokemon stats and provide insights.
-
-    Args:
-        name_or_id: Pokemon name or ID to analyze
-    """
-    logger.info("[TOOL] analyze_pokemon_stats", identifier=name_or_id)
-
-    try:
-        result = await POKEMON_TOOLS["analyze_pokemon_stats"](name_or_id)
-        if result.is_error:
-            return str(result.content[0]["text"])
-        return str(result.content[0]["text"])
-    except Exception as e:
-        error_msg = f"❌ Error: {str(e)}"
-        logger.error("[TOOL] analyze_pokemon_stats error", error=str(e))
-        return error_msg
-
-
-@app.tool()
 async def analyze_team(pokemon_names: list[str]) -> str:
     """Analyze a team of 2–6 Pokémon fetched in parallel.
 
@@ -154,30 +216,6 @@ async def analyze_team(pokemon_names: list[str]) -> str:
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
         logger.error("[TOOL] analyze_team error", error=str(e))
-        return error_msg
-
-
-@app.tool()
-async def get_pokedex_entry(pokemon: str) -> str:
-    """Get a complete Pokédex entry for a Pokémon, including flavor texts.
-
-    Returns a JSON object with types, base stats, abilities, height, weight,
-    flavor text descriptions (Spanish preferred, English fallback), generation,
-    habitat, legendary/mythical status, and capture rate. Ideal for narration
-    by the Dexter persona.
-
-    Args:
-        pokemon: Pokémon name (e.g. 'pikachu') or Pokédex number (e.g. '25').
-                 Alternate forms are supported (e.g. 'pikachu-alola').
-    """
-    logger.info("[TOOL] get_pokedex_entry", identifier=pokemon)
-
-    try:
-        result = await POKEMON_TOOLS["get_pokedex_entry"](pokemon)
-        return str(result.content[0]["text"])
-    except Exception as e:
-        error_msg = f"❌ Error: {str(e)}"
-        logger.error("[TOOL] get_pokedex_entry error", error=str(e))
         return error_msg
 
 
@@ -261,7 +299,7 @@ async def pokemon_comparison_resource(pokemon1: str, pokemon2: str) -> str:
 @app.prompt("educational/pokemon-analysis")
 async def pokemon_analysis_prompt(
     pokemon_name: str, analysis_type: str = "general", user_level: str = "beginner"
-) -> GetPromptResult:
+) -> list[Message]:
     """Educational prompt for Pokemon analysis.
 
     Args:
@@ -280,18 +318,10 @@ async def pokemon_analysis_prompt(
         result = await educational_prompts.create_pokemon_analysis_prompt(
             pokemon_name, analysis_type, user_level
         )
-        return result
+        return _prompt_messages(result)
     except Exception as e:
         logger.error("pokemon_analysis_prompt failed", error=str(e))
-        return GetPromptResult(
-            description=f"Error creating analysis prompt for {pokemon_name}",
-            messages=[
-                PromptMessage(
-                    role="user",
-                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
-                )
-            ],
-        )
+        return [UserMessage(f"❌ Error: {str(e)}")]
 
 
 @app.prompt("educational/team-building")
@@ -299,7 +329,7 @@ async def team_building_prompt(
     theme: str = "balanced",
     format: str = "casual",
     restrictions: list[str] | None = None,
-) -> GetPromptResult:
+) -> list[Message]:
     """Educational prompt for team building guidance.
 
     Args:
@@ -318,18 +348,10 @@ async def team_building_prompt(
         result = await educational_prompts.create_team_building_prompt(
             theme, format, restrictions
         )
-        return result
+        return _prompt_messages(result)
     except Exception as e:
         logger.error("team_building_prompt failed", error=str(e))
-        return GetPromptResult(
-            description="Error creating team building prompt",
-            messages=[
-                PromptMessage(
-                    role="user",
-                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
-                )
-            ],
-        )
+        return [UserMessage(f"❌ Error: {str(e)}")]
 
 
 @app.prompt("educational/type-effectiveness")
@@ -337,7 +359,7 @@ async def type_effectiveness_prompt(
     scenario: str = "learning",
     attacking_type: str | None = None,
     defending_types: list[str] | None = None,
-) -> GetPromptResult:
+) -> list[Message]:
     """Educational prompt for type effectiveness learning.
 
     Args:
@@ -356,18 +378,10 @@ async def type_effectiveness_prompt(
         result = await educational_prompts.create_type_effectiveness_prompt(
             scenario, attacking_type, defending_types
         )
-        return result
+        return _prompt_messages(result)
     except Exception as e:
         logger.error("type_effectiveness_prompt failed", error=str(e))
-        return GetPromptResult(
-            description="Error creating type effectiveness prompt",
-            messages=[
-                PromptMessage(
-                    role="user",
-                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
-                )
-            ],
-        )
+        return [UserMessage(f"❌ Error: {str(e)}")]
 
 
 # Battle Prompts
@@ -377,7 +391,7 @@ async def battle_strategy_prompt(
     opponent_team: list[str] | None = None,
     battle_format: str = "singles",
     strategy_focus: str = "balanced",
-) -> GetPromptResult:
+) -> list[Message]:
     """Battle strategy planning prompt.
 
     Args:
@@ -398,24 +412,16 @@ async def battle_strategy_prompt(
         result = await battle_prompts.create_battle_strategy_prompt(
             user_team, opponent_team, battle_format, strategy_focus
         )
-        return result
+        return _prompt_messages(result)
     except Exception as e:
         logger.error("battle_strategy_prompt failed", error=str(e))
-        return GetPromptResult(
-            description="Error creating battle strategy prompt",
-            messages=[
-                PromptMessage(
-                    role="user",
-                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
-                )
-            ],
-        )
+        return [UserMessage(f"❌ Error: {str(e)}")]
 
 
 @app.prompt("battle/matchup-analysis")
 async def matchup_analysis_prompt(
     pokemon1: str, pokemon2: str, scenario: str = "1v1", environment: str = "neutral"
-) -> GetPromptResult:
+) -> list[Message]:
     """Pokemon matchup analysis prompt.
 
     Args:
@@ -436,18 +442,10 @@ async def matchup_analysis_prompt(
         result = await battle_prompts.create_matchup_analysis_prompt(
             pokemon1, pokemon2, scenario, environment
         )
-        return result
+        return _prompt_messages(result)
     except Exception as e:
         logger.error("matchup_analysis_prompt failed", error=str(e))
-        return GetPromptResult(
-            description=f"Error analyzing {pokemon1} vs {pokemon2}",
-            messages=[
-                PromptMessage(
-                    role="user",
-                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
-                )
-            ],
-        )
+        return [UserMessage(f"❌ Error: {str(e)}")]
 
 
 @app.prompt("battle/team-preview")
@@ -455,7 +453,7 @@ async def team_preview_prompt(
     team: list[str],
     analysis_depth: str = "standard",
     focus_areas: list[str] | None = None,
-) -> GetPromptResult:
+) -> list[Message]:
     """Team preview analysis prompt.
 
     Args:
@@ -474,18 +472,10 @@ async def team_preview_prompt(
         result = await battle_prompts.create_team_preview_prompt(
             team, analysis_depth, focus_areas
         )
-        return result
+        return _prompt_messages(result)
     except Exception as e:
         logger.error("team_preview_prompt failed", error=str(e))
-        return GetPromptResult(
-            description="Error creating team preview prompt",
-            messages=[
-                PromptMessage(
-                    role="user",
-                    content=TextContent(type="text", text=f"❌ Error: {str(e)}"),
-                )
-            ],
-        )
+        return [UserMessage(f"❌ Error: {str(e)}")]
 
 
 async def create_server() -> MCPServer:

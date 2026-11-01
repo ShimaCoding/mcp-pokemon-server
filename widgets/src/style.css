@@ -1,0 +1,106 @@
+:root {
+  color-scheme: light dark;
+  --bg: light-dark(#ffffff, #1e1f22);
+  --surface: light-dark(#f4f5f7, #2a2b2f);
+  --text: light-dark(#1b1c1f, #e8e9ec);
+  --muted: light-dark(#6b6f76, #9a9ea6);
+  --border: light-dark(#e2e4e8, #3a3c41);
+  --accent: light-dark(#d93a3a, #ff6b6b);
+  --bar-track: light-dark(#e6e8ec, #34363b);
+  --radius: 14px;
+  --font: var(--font-sans, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+
+  --type-normal: #a8a77a; --type-fire: #ee8130; --type-water: #6390f0;
+  --type-electric: #f7d02c; --type-grass: #7ac74c; --type-ice: #96d9d6;
+  --type-fighting: #c22e28; --type-poison: #a33ea1; --type-ground: #e2bf65;
+  --type-flying: #a98ff3; --type-psychic: #f95587; --type-bug: #a6b91a;
+  --type-rock: #b6a136; --type-ghost: #735797; --type-dragon: #6f35fc;
+  --type-dark: #705746; --type-steel: #b7b7ce; --type-fairy: #d685ad;
+}
+[data-theme='light'] { color-scheme: light; }
+[data-theme='dark'] { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; }
+body { font-family: var(--font); color: var(--text); font-size: 14px; line-height: 1.45; }
+#root { padding: 4px; }
+
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.loading, .error { margin: 0; padding: 12px 4px; color: var(--muted); }
+.error { color: var(--accent); }
+
+.type-chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--type);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 0.35);
+}
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.sprite { image-rendering: pixelated; width: 96px; height: 96px; }
+.sprite-sm { image-rendering: pixelated; width: 40px; height: 40px; }
+
+/* --- Ficha Pokédex ---------------------------------------------------- */
+.dex-head { display: flex; gap: 16px; align-items: center; }
+.dex-art {
+  flex: none;
+  width: 120px; height: 120px;
+  display: grid; place-items: center;
+  background: var(--surface);
+  border-radius: 50%;
+}
+.dex-art img { width: 112px; height: 112px; object-fit: contain; }
+.dex-title { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.dex-name { margin: 0; font-size: 20px; font-weight: 700; }
+.dex-num { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.dex-genus { margin: 0; color: var(--muted); font-size: 13px; }
+.dex-flavor {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-radius: 10px;
+  font-style: italic;
+}
+.dex-facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; color: var(--muted); font-size: 13px; }
+.dex-facts b { color: var(--text); font-weight: 600; }
+.section-title { margin: 16px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+.stat-row { display: grid; grid-template-columns: 76px 32px 1fr; align-items: center; gap: 8px; font-size: 13px; }
+.stat-row + .stat-row { margin-top: 4px; }
+.stat-label { color: var(--muted); }
+.stat-value { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-bar { height: 8px; border-radius: 4px; background: var(--bar-track); overflow: hidden; }
+.stat-bar > span { display: block; height: 100%; border-radius: 4px; background: var(--bar, var(--accent)); }
+.stat-total { margin-top: 8px; font-size: 13px; color: var(--muted); }
+.stat-total b { color: var(--text); }
+
+/* --- Gráfico de stats -------------------------------------------------- */
+.chart-layout { display: grid; gap: 16px; align-items: center; }
+.chart-layout.single { grid-template-columns: minmax(200px, 280px) 1fr; }
+@media (max-width: 520px) { .chart-layout.single { grid-template-columns: 1fr; } }
+.radar { width: 100%; max-width: 320px; height: auto; margin: 0 auto; display: block; overflow: visible; }
+.radar .grid { fill: none; stroke: var(--border); }
+.radar .axis { stroke: var(--border); }
+.radar .label { fill: var(--muted); font-size: 11px; font-family: var(--font); }
+.radar .series { fill-opacity: 0.18; stroke-width: 2; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.legend-swatch { width: 10px; height: 10px; border-radius: 50%; background: var(--series); }
+.legend-total { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.compare { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.compare th, .compare td { padding: 5px 6px; text-align: right; border-bottom: 1px solid var(--border); }
+.compare th:first-child, .compare td:first-child { text-align: left; }
+.compare th { color: var(--muted); font-weight: 600; }
+.compare td.best { color: var(--series, var(--text)); font-weight: 700; }
+.compare tr:last-child td { border-bottom: none; }

@@ -6,9 +6,49 @@ from typing import Any
 
 from ..clients.pokeapi_client import PokemonNotFoundError, get_pokemon_client
 from ..config.logging import get_logger
+from ..models.pokemon_models import Pokemon
 from ..models.response_models import ToolResult
 
 logger = get_logger(__name__)
+
+_ARTWORK_URL = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{id}.png"
+
+
+def _sorted_types(pokemon: Pokemon) -> list[str]:
+    return [t.type["name"] for t in sorted(pokemon.types, key=lambda x: x.slot)]
+
+
+def pokemon_card(pokemon: Pokemon) -> dict[str, Any]:
+    """Widget payload for the Pokédex card (``ui://pokedex/card.html``)."""
+    sprite = pokemon.sprites.front_default
+    return {
+        "id": pokemon.id,
+        "name": pokemon.name,
+        "sprite": str(sprite) if sprite else None,
+        "artwork": _ARTWORK_URL.format(id=pokemon.id),
+        "types": _sorted_types(pokemon),
+        "height_m": pokemon.height_meters,
+        "weight_kg": pokemon.weight_kg,
+        "stats": pokemon.stat_dict,
+        "abilities": [
+            {"name": a.ability["name"], "hidden": a.is_hidden}
+            for a in sorted(pokemon.abilities, key=lambda x: x.slot)
+        ],
+    }
+
+
+def stats_entry(pokemon: Pokemon) -> dict[str, Any]:
+    """One item of the stats chart payload (``ui://pokedex/stats.html``)."""
+    sprite = pokemon.sprites.front_default
+    stats = pokemon.stat_dict
+    return {
+        "id": pokemon.id,
+        "name": pokemon.name,
+        "sprite": str(sprite) if sprite else None,
+        "types": _sorted_types(pokemon),
+        "stats": stats,
+        "total": sum(stats.values()),
+    }
 
 
 async def get_pokemon_info(name_or_id: str) -> ToolResult:
@@ -52,7 +92,7 @@ async def get_pokemon_info(name_or_id: str) -> ToolResult:
             }
         ]
 
-        return ToolResult(content=content)
+        return ToolResult(content=content, structured_content=pokemon_card(pokemon))
 
     except PokemonNotFoundError:
         error_content = [
@@ -231,7 +271,9 @@ async def analyze_pokemon_stats(name_or_id: str) -> ToolResult:
         content_text += "\n*Based on base stats only. Actual performance depends on level, nature, IVs, and EVs.*"
 
         content = [{"type": "text", "text": content_text}]
-        return ToolResult(content=content)
+        return ToolResult(
+            content=content, structured_content={"pokemon": [stats_entry(pokemon)]}
+        )
 
     except PokemonNotFoundError:
         error_content = [
@@ -496,8 +538,19 @@ async def get_pokedex_entry(name_or_id: str) -> ToolResult:
         "evolution_chain": evolution_stages,
     }
 
+    card = {
+        **pokemon_card(pokemon),
+        "genus": entry["genus"],
+        "flavor_text": flavor_texts[0] if flavor_texts else None,
+        "generation": generation,
+        "habitat": entry["habitat"],
+        "is_legendary": species.is_legendary,
+        "is_mythical": species.is_mythical,
+    }
+
     return ToolResult(
-        content=[{"type": "text", "text": json.dumps(entry, ensure_ascii=False)}]
+        content=[{"type": "text", "text": json.dumps(entry, ensure_ascii=False)}],
+        structured_content=card,
     )
 
 
@@ -619,6 +672,88 @@ async def analyze_team(pokemon_names: list[str]) -> ToolResult:
     )
 
 
+_STAT_LABELS = {
+    "hp": "HP",
+    "attack": "Atk",
+    "defense": "Def",
+    "special-attack": "SpA",
+    "special-defense": "SpD",
+    "speed": "Spe",
+}
+
+
+async def compare_pokemon(pokemon_names: list[str]) -> ToolResult:
+    """Compare the base stats of 2–6 Pokémon side by side.
+
+    Args:
+        pokemon_names: List of 2–6 Pokémon names or Pokédex IDs.
+
+    Returns:
+        ToolResult with a markdown stats table for the LLM and a
+        ``{"pokemon": [...]}`` payload for the stats widget.
+    """
+    if not 2 <= len(pokemon_names) <= 6:
+        return ToolResult(
+            content=[
+                {
+                    "type": "text",
+                    "text": "❌ Compare between 2 and 6 Pokémon.",
+                }
+            ],
+            is_error=True,
+        )
+
+    requested = [str(n).strip().lower() for n in pokemon_names]
+    try:
+        client = await get_pokemon_client()
+        fetched = await client.get_multiple_pokemon(requested)
+    except Exception as e:
+        logger.error("Error fetching Pokémon to compare", error=str(e))
+        return ToolResult(
+            content=[{"type": "text", "text": f"❌ Error fetching Pokémon: {str(e)}"}],
+            is_error=True,
+        )
+
+    not_found = [
+        n for n in requested if not any(n in (p.name, str(p.id)) for p in fetched)
+    ]
+    if len(fetched) < 2:
+        return ToolResult(
+            content=[
+                {
+                    "type": "text",
+                    "text": "❌ Need at least 2 valid Pokémon to compare. "
+                    f"Not found: {', '.join(not_found) or '—'}",
+                }
+            ],
+            is_error=True,
+        )
+
+    entries = [stats_entry(p) for p in fetched]
+
+    header = "| Pokémon | " + " | ".join(_STAT_LABELS.values()) + " | Total |"
+    divider = "|---" * (len(_STAT_LABELS) + 2) + "|"
+    rows = [
+        f"| {e['name'].title()} | "
+        + " | ".join(str(e["stats"].get(k, 0)) for k in _STAT_LABELS)
+        + f" | {e['total']} |"
+        for e in entries
+    ]
+    best = [
+        f"{label}: {max(entries, key=lambda e: e['stats'].get(key, 0))['name'].title()}"
+        for key, label in _STAT_LABELS.items()
+    ]
+    text = "\n".join([header, divider, *rows])
+    text += "\n\n**Best per stat:** " + ", ".join(best)
+    if not_found:
+        text += f"\n\n**Not found:** {', '.join(not_found)}"
+
+    return ToolResult(
+        content=[{"type": "text", "text": text}],
+        structured_content={"pokemon": entries},
+    )
+
+
 # Tool registry for easy access
 POKEMON_TOOLS = {
     "get_pokemon_info": get_pokemon_info,
@@ -627,4 +762,5 @@ POKEMON_TOOLS = {
     "analyze_pokemon_stats": analyze_pokemon_stats,
     "get_pokedex_entry": get_pokedex_entry,
     "analyze_team": analyze_team,
+    "compare_pokemon": compare_pokemon,
 }
