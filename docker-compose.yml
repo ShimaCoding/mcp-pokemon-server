@@ -43,6 +43,7 @@ services:
       - "traefik.http.routers.mcp-pokemon.rule=Host(`mcp-pokemon.shimadev.xyz`) || Host(`mcp.mcpokedex.com`)"
       - "traefik.http.routers.mcp-pokemon.entrypoints=websecure"
       - "traefik.http.routers.mcp-pokemon.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.mcp-pokemon.service=mcp-pokemon"
       - "traefik.http.services.mcp-pokemon.loadbalancer.server.port=8000"
       - "traefik.http.routers.mcp-pokemon-http.rule=Host(`mcp.mcpokedex.com`)"
       - "traefik.http.routers.mcp-pokemon-http.entrypoints=web"
