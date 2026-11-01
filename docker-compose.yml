@@ -40,10 +40,14 @@ services:
           memory: 128M
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.mcp-pokemon.rule=Host(`mcp-pokemon.shimadev.xyz`)"
+      - "traefik.http.routers.mcp-pokemon.rule=Host(`mcp-pokemon.shimadev.xyz`) || Host(`mcp.mcpokedex.com`)"
       - "traefik.http.routers.mcp-pokemon.entrypoints=websecure"
       - "traefik.http.routers.mcp-pokemon.tls.certresolver=letsencrypt"
       - "traefik.http.services.mcp-pokemon.loadbalancer.server.port=8000"
+      - "traefik.http.routers.mcp-pokemon-http.rule=Host(`mcp.mcpokedex.com`)"
+      - "traefik.http.routers.mcp-pokemon-http.entrypoints=web"
+      - "traefik.http.routers.mcp-pokemon-http.middlewares=redirect-to-https@file"
+      - "traefik.http.routers.mcp-pokemon-http.service=mcp-pokemon"
 
   redis:
     image: redis:7-alpine
