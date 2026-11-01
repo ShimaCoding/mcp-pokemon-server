@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "tsc --noEmit && WIDGET=card vite build && WIDGET=stats vite build",
+    "build": "tsc --noEmit && for w in card stats types team search; do WIDGET=$w vite build || exit 1; done",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -12,6 +12,9 @@ from mcp.server.apps import Apps, ResourceCsp
 
 CARD_URI = "ui://pokedex/card.html"
 STATS_URI = "ui://pokedex/stats.html"
+TYPES_URI = "ui://pokedex/types.html"
+TEAM_URI = "ui://pokedex/team.html"
+SEARCH_URI = "ui://pokedex/search.html"
 
 _HTML_DIR = Path(__file__).parent / "html"
 
@@ -44,5 +47,29 @@ def register_widgets(apps: Apps) -> None:
         name="pokedex-stats",
         title="Gráfico de estadísticas",
         description="Radar de estadísticas base de uno o varios Pokémon superpuestos.",
+        csp=_CSP,
+    )
+    apps.add_html_resource(
+        TYPES_URI,
+        _read("types.html"),
+        name="pokedex-types",
+        title="Tabla de tipos",
+        description="Multiplicadores de daño de un tipo, en ataque y en defensa.",
+        csp=_CSP,
+    )
+    apps.add_html_resource(
+        TEAM_URI,
+        _read("team.html"),
+        name="pokedex-team",
+        title="Análisis de equipo",
+        description="Equipo de 2 a 6 Pokémon con roles, destacados y cobertura de tipos.",
+        csp=_CSP,
+    )
+    apps.add_html_resource(
+        SEARCH_URI,
+        _read("search.html"),
+        name="pokedex-search",
+        title="Buscador Pokédex",
+        description="Lista paginada de Pokémon; al hacer clic en uno se pide su ficha.",
         csp=_CSP,
     )

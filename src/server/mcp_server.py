@@ -19,7 +19,14 @@ from ..prompts.battle_prompts import BattlePromptManager
 from ..prompts.educational_prompts import EducationalPromptManager
 from ..resources.pokemon_resources import PokemonResourceManager
 from ..tools.pokemon_tools import POKEMON_TOOLS
-from ..widgets import CARD_URI, STATS_URI, register_widgets
+from ..widgets import (
+    CARD_URI,
+    SEARCH_URI,
+    STATS_URI,
+    TEAM_URI,
+    TYPES_URI,
+    register_widgets,
+)
 
 # Setup logging
 setup_logging()
@@ -147,17 +154,8 @@ async def compare_pokemon(pokemon_names: list[str]) -> CallToolResult:
         return _tool_error("compare_pokemon", e)
 
 
-# Create MCP server instance (host/port are transport options in SDK v2, see run_server)
-app = MCPServer(
-    "Pokemon MCP Server",
-    version=__version__,
-    lifespan=lifespan,
-    extensions=[apps],
-)
-
-
-@app.tool()
-async def search_pokemon(limit: int = 20, offset: int = 0) -> str:
+@apps.tool(resource_uri=SEARCH_URI)
+async def search_pokemon(limit: int = 20, offset: int = 0) -> CallToolResult:
     """Search for Pokemon with pagination.
 
     Args:
@@ -167,18 +165,15 @@ async def search_pokemon(limit: int = 20, offset: int = 0) -> str:
     logger.info("[TOOL] search_pokemon", limit=limit, offset=offset)
 
     try:
-        result = await POKEMON_TOOLS["search_pokemon"](limit=limit, offset=offset)
-        if result.is_error:
-            return str(result.content[0]["text"])
-        return str(result.content[0]["text"])
+        return _call_tool_result(
+            await POKEMON_TOOLS["search_pokemon"](limit=limit, offset=offset)
+        )
     except Exception as e:
-        error_msg = f"❌ Error: {str(e)}"
-        logger.error("[TOOL] search_pokemon error", error=str(e))
-        return error_msg
+        return _tool_error("search_pokemon", e)
 
 
-@app.tool()
-async def get_type_effectiveness(attacking_type: str) -> str:
+@apps.tool(resource_uri=TYPES_URI)
+async def get_type_effectiveness(attacking_type: str) -> CallToolResult:
     """Get type effectiveness chart for a Pokemon type.
 
     Args:
@@ -187,18 +182,15 @@ async def get_type_effectiveness(attacking_type: str) -> str:
     logger.info("[TOOL] get_type_effectiveness", attacking_type=attacking_type)
 
     try:
-        result = await POKEMON_TOOLS["get_type_effectiveness"](attacking_type)
-        if result.is_error:
-            return str(result.content[0]["text"])
-        return str(result.content[0]["text"])
+        return _call_tool_result(
+            await POKEMON_TOOLS["get_type_effectiveness"](attacking_type)
+        )
     except Exception as e:
-        error_msg = f"❌ Error: {str(e)}"
-        logger.error("[TOOL] get_type_effectiveness error", error=str(e))
-        return error_msg
+        return _tool_error("get_type_effectiveness", e)
 
 
-@app.tool()
-async def analyze_team(pokemon_names: list[str]) -> str:
+@apps.tool(resource_uri=TEAM_URI)
+async def analyze_team(pokemon_names: list[str]) -> CallToolResult:
     """Analyze a team of 2–6 Pokémon fetched in parallel.
 
     Returns a JSON object with per-member data (types, base stats, BST, battle
@@ -211,12 +203,18 @@ async def analyze_team(pokemon_names: list[str]) -> str:
     logger.info("[TOOL] analyze_team", team=pokemon_names)
 
     try:
-        result = await POKEMON_TOOLS["analyze_team"](pokemon_names)
-        return str(result.content[0]["text"])
+        return _call_tool_result(await POKEMON_TOOLS["analyze_team"](pokemon_names))
     except Exception as e:
-        error_msg = f"❌ Error: {str(e)}"
-        logger.error("[TOOL] analyze_team error", error=str(e))
-        return error_msg
+        return _tool_error("analyze_team", e)
+
+
+# Create MCP server instance (host/port are transport options in SDK v2, see run_server)
+app = MCPServer(
+    "Pokemon MCP Server",
+    version=__version__,
+    lifespan=lifespan,
+    extensions=[apps],
+)
 
 
 # Resource handlers - Dynamic Pokemon Resources

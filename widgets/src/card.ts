@@ -22,6 +22,19 @@ interface CardData {
 
 const SEGMENTS = 12
 
+// PokeAPI only names habitats in English.
+const HABITATS: Record<string, string> = {
+  cave: 'Cueva',
+  forest: 'Bosque',
+  grassland: 'Pradera',
+  mountain: 'Montaña',
+  rare: 'Raro',
+  'rough-terrain': 'Terreno agreste',
+  sea: 'Mar',
+  urban: 'Ciudad',
+  'waters-edge': 'Orilla del agua',
+}
+
 function statRow(key: string, value: number, color: string): HTMLElement {
   // 12 cells of 15 points: typical stats stay readable; outliers (Blissey's HP 255) fill the bar.
   const filled = Math.min(SEGMENTS, Math.max(value > 0 ? 1 : 0, Math.round(value / 15)))
@@ -43,7 +56,7 @@ function render(root: HTMLElement, d: CardData): void {
     ['Peso', `${d.weight_kg.toFixed(1)} kg`],
   ]
   if (d.generation) facts.push(['Generación', d.generation])
-  if (d.habitat && d.habitat !== 'unknown') facts.push(['Hábitat', displayName(d.habitat)])
+  if (d.habitat && d.habitat !== 'unknown') facts.push(['Hábitat', HABITATS[d.habitat] ?? displayName(d.habitat)])
   if (d.is_legendary) facts.push(['Clase', 'Legendario'])
   else if (d.is_mythical) facts.push(['Clase', 'Singular'])
 

@@ -57,7 +57,17 @@ All tools and resources call through `PokemonAPIClient` (`src/clients/pokeapi_cl
 
 ## MCP Apps (widgets)
 
-The server uses the SDK's `mcp.server.apps.Apps` extension. `get_pokemon_info` / `get_pokedex_entry` are bound to `ui://pokedex/card.html` and `analyze_pokemon_stats` / `compare_pokemon` to `ui://pokedex/stats.html`. These tools return a `CallToolResult`: text content for the LLM plus `structuredContent` for the widget (`pokemon_card()` / `stats_entry()` in `pokemon_tools.py`).
+The server uses the SDK's `mcp.server.apps.Apps` extension. Every tool is bound to a widget and returns a `CallToolResult`: text content for the LLM plus `structuredContent` for the widget (built in `pokemon_tools.py`):
+
+| Widget | Tools | Payload |
+|---|---|---|
+| `ui://pokedex/card.html` | `get_pokemon_info`, `get_pokedex_entry` | `pokemon_card()` (+ species fields) |
+| `ui://pokedex/stats.html` | `analyze_pokemon_stats`, `compare_pokemon` | `{"pokemon": [stats_entry()]}` |
+| `ui://pokedex/types.html` | `get_type_effectiveness` | `type_chart()`: attack/defense multipliers |
+| `ui://pokedex/team.html` | `analyze_team` | members (`stats_entry()` + roles), `team_analysis`, `not_found` |
+| `ui://pokedex/search.html` | `search_pokemon` | `count`, `limit`, `offset`, `results` |
+
+The search widget is interactive: clicking a Pokémon calls `app.sendMessage` (the host posts it to the chat) and paging calls `app.callServerTool("search_pokemon")`.
 
 - UI-bound tools (`@apps.tool`) must be declared **before** `MCPServer(extensions=[apps])` is constructed; the extension is consumed at construction time.
 - Widget sources live in `widgets/` (Vite + TS + `vite-plugin-singlefile`, runtime `@modelcontextprotocol/ext-apps`). `make widgets` builds them into `src/widgets/html/*.html`, which **is committed** so the Python image needs no Node. Rebuild and commit after editing widget sources.

@@ -150,3 +150,93 @@ body { font-family: var(--font); color: var(--gbc-dark); font-size: 12px; line-h
 .compare td.best { color: var(--series, var(--gbc-dark)); }
 .compare td.best::before { content: '▶'; font-size: 8px; margin-right: 4px; }
 .compare tr.total td { border-top: 2px solid var(--gbc-border); }
+
+/* --- Tabla de tipos ----------------------------------------------------- */
+.types-head, .search-head { display: flex; align-items: center; gap: 10px; }
+.types-head .type-chip { font-size: 12px; padding: 4px 12px; }
+.types-title { font-size: 14px; }
+.search-head { justify-content: space-between; }
+.hint { margin: -4px 0 8px; font-size: 10px; color: var(--gbc-mid); }
+.type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 4px; }
+.type-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 3px 4px 3px 3px;
+  border: 1px solid var(--gbc-border);
+  background: var(--gbc-bg);
+}
+.type-cell .type-chip { padding: 1px 4px; font-size: 9px; border-width: 1px; }
+.mult { font-size: 10px; }
+/* x1 cells fade out so the multipliers that matter stand out. */
+.m-normal { opacity: 0.45; }
+.m-double .mult, .legend-mult.m-double { color: var(--gbc-red); }
+.m-half .mult, .legend-mult.m-half { color: #3e7bfa; }
+.m-none { background: var(--gbc-dark); }
+.m-none .mult, .legend-mult.m-none { color: var(--gbc-cream); }
+.legend-mult.m-none { padding: 0 4px; }
+.types-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 10px; }
+
+/* --- Análisis de equipo (party menu) ------------------------------------ */
+.party { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 6px; }
+.party-slot {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #fff;
+  border: 2px solid var(--gbc-border);
+  box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 3px var(--gbc-light);
+}
+.party-slot.empty {
+  display: flex;
+  justify-content: center;
+  min-height: 58px;
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+  color: var(--gbc-mid);
+  font-size: 10px;
+}
+.party-sprite { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+.party-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.party-name { font-size: 12px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.party-name .dex-num { font-size: 10px; }
+.party-roles { display: flex; flex-wrap: wrap; gap: 4px; }
+.role { font-size: 9px; color: var(--gbc-mid); border: 1px solid var(--gbc-light); padding: 0 4px; }
+.party-bst { font-size: 9px; color: var(--gbc-mid); text-align: right; }
+.party-bst b { display: block; font-size: 13px; font-weight: normal; color: var(--gbc-dark); }
+
+/* --- Buscador ----------------------------------------------------------- */
+.dex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; margin-top: 10px; }
+.dex-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px 6px;
+  font: inherit;
+  color: inherit;
+  background: var(--gbc-bg);
+  border: 2px solid var(--gbc-border);
+  cursor: pointer;
+}
+.dex-tile:hover, .dex-tile:focus-visible { background: #fff; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.18); outline: none; }
+.dex-tile.picked { background: #fff; border-color: var(--gbc-red); }
+.dex-tile .dex-num { font-size: 9px; }
+.dex-tile .sprite-sm { width: 64px; height: 64px; }
+.tile-name { font-size: 9px; text-transform: uppercase; text-align: center; }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.pager .hint { margin: 0; text-align: center; }
+.pager-btn {
+  font: inherit;
+  font-size: 10px;
+  padding: 4px 8px;
+  color: var(--gbc-cream);
+  background: var(--gbc-dark);
+  border: 2px solid var(--gbc-border);
+  cursor: pointer;
+}
+.pager-btn:disabled { opacity: 0.3; cursor: default; }

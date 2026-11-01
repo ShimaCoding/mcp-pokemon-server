@@ -12,6 +12,9 @@ from ..models.response_models import ToolResult
 logger = get_logger(__name__)
 
 _ARTWORK_URL = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{id}.png"
+_SPRITE_URL = (
+    "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{id}.png"
+)
 
 
 def _sorted_types(pokemon: Pokemon) -> list[str]:
@@ -48,6 +51,31 @@ def stats_entry(pokemon: Pokemon) -> dict[str, Any]:
         "types": _sorted_types(pokemon),
         "stats": stats,
         "total": sum(stats.values()),
+    }
+
+
+def type_chart(type_name: str, damage_relations: dict[str, Any]) -> dict[str, Any]:
+    """Widget payload for the type chart (``ui://pokedex/types.html``).
+
+    ``attack`` lists the types this type hits for 2x / 0.5x / 0x; ``defense``
+    the types that hit it for those multipliers.
+    """
+
+    def names(key: str) -> list[str]:
+        return [t["name"] for t in damage_relations.get(key, [])]
+
+    return {
+        "type": type_name,
+        "attack": {
+            "double": names("double_damage_to"),
+            "half": names("half_damage_to"),
+            "none": names("no_damage_to"),
+        },
+        "defense": {
+            "double": names("double_damage_from"),
+            "half": names("half_damage_from"),
+            "none": names("no_damage_from"),
+        },
     }
 
 
@@ -133,10 +161,18 @@ async def search_pokemon(
 
         # Format results for display
         pokemon_list = []
+        entries = []
         for pokemon in search_result.results:
             # Extract ID from URL
             pokemon_id = pokemon["url"].strip("/").split("/")[-1]
             pokemon_list.append(f"#{pokemon_id}: {pokemon['name'].title()}")
+            entries.append(
+                {
+                    "id": int(pokemon_id),
+                    "name": pokemon["name"],
+                    "sprite": _SPRITE_URL.format(id=pokemon_id),
+                }
+            )
 
         content = [
             {
@@ -150,7 +186,15 @@ async def search_pokemon(
             }
         ]
 
-        return ToolResult(content=content)
+        return ToolResult(
+            content=content,
+            structured_content={
+                "count": search_result.count,
+                "limit": limit,
+                "offset": offset,
+                "results": entries,
+            },
+        )
 
     except Exception as e:
         logger.error("Error searching Pokemon", error=str(e))
@@ -198,7 +242,12 @@ async def get_type_effectiveness(attacking_type: str) -> ToolResult:
                 content_text += f"## {category}\n*None*\n\n"
 
         content = [{"type": "text", "text": content_text}]
-        return ToolResult(content=content)
+        return ToolResult(
+            content=content,
+            structured_content=type_chart(
+                type_data.get("name", attacking_type.lower()), damage_relations
+            ),
+        )
 
     except PokemonNotFoundError:
         error_content = [
@@ -603,6 +652,7 @@ async def analyze_team(pokemon_names: list[str]) -> ToolResult:
         )
 
     members: list[dict[str, Any]] = []
+    widget_members: list[dict[str, Any]] = []
     for p in team:
         stats = {s.stat["name"]: s.base_stat for s in p.stats}
         members.append(
@@ -617,6 +667,7 @@ async def analyze_team(pokemon_names: list[str]) -> ToolResult:
                 "roles": _determine_roles(stats),
             }
         )
+        widget_members.append({**stats_entry(p), "roles": members[-1]["roles"]})
 
     # Team-wide metrics
     avg_bst = sum(m["total_bst"] for m in members) / len(members)
@@ -668,7 +719,12 @@ async def analyze_team(pokemon_names: list[str]) -> ToolResult:
         analysis["not_found"] = not_found
 
     return ToolResult(
-        content=[{"type": "text", "text": json.dumps(analysis, ensure_ascii=False)}]
+        content=[{"type": "text", "text": json.dumps(analysis, ensure_ascii=False)}],
+        structured_content={
+            "members": widget_members,
+            "team_analysis": analysis["team_analysis"],
+            "not_found": not_found,
+        },
     )
 
 
