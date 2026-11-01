@@ -87,7 +87,7 @@ body { font-family: var(--font); color: var(--text); font-size: 14px; line-heigh
 .chart-layout { display: grid; gap: 16px; align-items: center; }
 .chart-layout.single { grid-template-columns: minmax(200px, 280px) 1fr; }
 @media (max-width: 520px) { .chart-layout.single { grid-template-columns: 1fr; } }
-.radar { width: 100%; max-width: 320px; height: auto; margin: 0 auto; display: block; overflow: visible; }
+.radar { width: 100%; max-width: 380px; height: auto; margin: 0 auto; display: block; overflow: visible; }
 .radar .grid { fill: none; stroke: var(--border); }
 .radar .axis { stroke: var(--border); }
 .radar .label { fill: var(--muted); font-size: 11px; font-family: var(--font); }

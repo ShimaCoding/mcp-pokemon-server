@@ -29,7 +29,7 @@ function svg(tag: string, attrs: Record<string, string | number>, text?: string)
 function radar(entries: StatsEntry[], colors: string[]): SVGElement {
   const size = 300
   const c = size / 2
-  const r = 100
+  const r = 110
   // Scale to the largest stat shown (min 150) so small Pokémon don't collapse to a dot.
   const peak = Math.max(150, ...entries.flatMap((e) => STAT_KEYS.map((k) => e.stats[k] ?? 0)))
   const max = Math.ceil(peak / 50) * 50
