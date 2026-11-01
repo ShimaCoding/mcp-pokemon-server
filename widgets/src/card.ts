@@ -20,13 +20,16 @@ interface CardData {
   is_mythical?: boolean
 }
 
+const SEGMENTS = 12
+
 function statRow(key: string, value: number, color: string): HTMLElement {
-  // 180 keeps typical stats readable; outliers (Blissey's HP 255) just fill the bar.
-  const pct = Math.min(100, Math.round((value / 180) * 100))
+  // 12 cells of 15 points: typical stats stay readable; outliers (Blissey's HP 255) fill the bar.
+  const filled = Math.min(SEGMENTS, Math.max(value > 0 ? 1 : 0, Math.round(value / 15)))
+  const cells = Array.from({ length: SEGMENTS }, (_, i) => h('span', { class: i < filled ? 'on' : '' }))
   return h('div', { class: 'stat-row' }, [
     h('span', { class: 'stat-label', text: STAT_LABELS[key] ?? key }),
+    h('div', { class: 'stat-bar', style: `--bar:${color}` }, cells),
     h('span', { class: 'stat-value', text: value }),
-    h('div', { class: 'stat-bar' }, [h('span', { style: `width:${pct}%;--bar:${color}` })]),
   ])
 }
 
@@ -47,11 +50,11 @@ function render(root: HTMLElement, d: CardData): void {
   root.replaceChildren(
     h('article', { class: 'card' }, [
       h('header', { class: 'dex-head' }, [
-        h('div', { class: 'dex-art' }, [sprite(d.artwork ?? d.sprite, name, '')]),
+        h('div', { class: 'sprite-frame' }, [sprite(d.sprite ?? d.artwork, name, '')]),
         h('div', { class: 'dex-title' }, [
           h('h1', { class: 'dex-name' }, [
             document.createTextNode(`${name} `),
-            h('span', { class: 'dex-num', text: `#${String(d.id).padStart(4, '0')}` }),
+            h('span', { class: 'dex-num', text: `#${String(d.id).padStart(3, '0')}` }),
           ]),
           d.genus ? h('p', { class: 'dex-genus', text: d.genus }) : null,
           h('div', { class: 'chips' }, d.types.map(typeChip)),
@@ -61,17 +64,17 @@ function render(root: HTMLElement, d: CardData): void {
       h(
         'div',
         { class: 'dex-facts' },
-        facts.map(([k, v]) => h('span', {}, [document.createTextNode(`${k} `), h('b', { text: v })])),
+        facts.map(([k, v]) => h('div', { class: 'fact' }, [document.createTextNode(k), h('b', { text: v })])),
       ),
       h('h2', { class: 'section-title', text: 'Estadísticas base' }),
       h('div', {}, STAT_KEYS.map((k) => statRow(k, d.stats[k] ?? 0, color))),
-      h('div', { class: 'stat-total' }, [document.createTextNode('Total '), h('b', { text: total })]),
+      h('div', { class: 'stat-total' }, [document.createTextNode('TOTAL '), h('b', { text: total })]),
       h('h2', { class: 'section-title', text: 'Habilidades' }),
       h(
         'div',
         { class: 'chips' },
         d.abilities.map((a) =>
-          h('span', { class: 'type-chip', text: displayName(a.name) + (a.hidden ? ' (oculta)' : ''), style: '--type: var(--muted)' }),
+          h('span', { class: a.hidden ? 'ability hidden' : 'ability', text: displayName(a.name) + (a.hidden ? ' (oculta)' : '') }),
         ),
       ),
     ]),

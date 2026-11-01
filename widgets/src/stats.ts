@@ -44,7 +44,7 @@ function radar(entries: StatsEntry[], colors: string[]): SVGElement {
 
   for (const f of [0.25, 0.5, 0.75, 1]) {
     const pts = STAT_KEYS.map((_, i) => point(i, max * f).join(',')).join(' ')
-    root.append(svg('polygon', { class: 'grid', points: pts }))
+    root.append(svg('polygon', { class: f === 1 ? 'grid outer' : 'grid', points: pts }))
   }
   STAT_KEYS.forEach((key, i) => {
     const [x, y] = point(i, max)
@@ -57,6 +57,11 @@ function radar(entries: StatsEntry[], colors: string[]): SVGElement {
   entries.forEach((e, idx) => {
     const pts = STAT_KEYS.map((k, i) => point(i, e.stats[k] ?? 0).join(',')).join(' ')
     root.append(svg('polygon', { class: 'series', points: pts, fill: colors[idx], stroke: colors[idx] }))
+    // Square "pixel" markers on each vertex.
+    STAT_KEYS.forEach((k, i) => {
+      const [x, y] = point(i, e.stats[k] ?? 0)
+      root.append(svg('rect', { class: 'vertex', x: x - 3, y: y - 3, width: 6, height: 6, fill: colors[idx] }))
+    })
   })
   return root
 }
@@ -85,11 +90,11 @@ function compareTable(entries: StatsEntry[], colors: string[]): HTMLElement {
   )
   const head = h('tr', {}, [
     h('th', { text: '' }),
-    ...entries.map((e, i) => h('th', { text: displayName(e.name), style: `color:${colors[i]}` })),
+    ...entries.map((e) => h('th', { text: displayName(e.name) })),
   ])
   const rows = [...STAT_KEYS, 'total'].map((k) =>
-    h('tr', {}, [
-      h('td', { text: k === 'total' ? 'Total' : STAT_LABELS[k] }),
+    h('tr', { class: k === 'total' ? 'total' : '' }, [
+      h('td', { text: k === 'total' ? 'TOTAL' : STAT_LABELS[k] }),
       ...entries.map((e, i) => {
         const v = k === 'total' ? e.total : e.stats[k] ?? 0
         const isBest = entries.length > 1 && v === best[k]
@@ -103,7 +108,7 @@ function compareTable(entries: StatsEntry[], colors: string[]): HTMLElement {
 function render(root: HTMLElement, data: StatsData): void {
   const entries = data.pokemon ?? []
   if (entries.length === 0) {
-    root.replaceChildren(h('p', { class: 'error', text: 'Sin datos para mostrar.' }))
+    root.replaceChildren(h('p', { class: 'error', text: 'SIN DATOS PARA MOSTRAR.' }))
     return
   }
   const colors =

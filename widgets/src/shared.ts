@@ -18,11 +18,11 @@ export const STAT_KEYS = [
 
 export const STAT_LABELS: Record<string, string> = {
   hp: 'PS',
-  attack: 'Ataque',
-  defense: 'Defensa',
-  'special-attack': 'At. Esp.',
-  'special-defense': 'Def. Esp.',
-  speed: 'Velocidad',
+  attack: 'ATK',
+  defense: 'DEF',
+  'special-attack': 'SATK',
+  'special-defense': 'SDEF',
+  speed: 'SPD',
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -61,7 +61,7 @@ export function typeChip(type: string): HTMLElement {
   return h('span', {
     class: 'type-chip',
     text: TYPE_LABELS[type] ?? displayName(type),
-    style: `--type: var(--type-${type}, var(--muted))`,
+    style: `--type: var(--type-${type}, var(--gbc-mid))`,
   })
 }
 
@@ -88,7 +88,7 @@ function applyContext(ctx: McpUiHostContext | undefined): void {
  */
 export function mountWidget<T>(name: string, render: (root: HTMLElement, data: T) => void): App {
   const root = document.getElementById('root')!
-  root.replaceChildren(h('p', { class: 'loading', text: 'Cargando…' }))
+  root.replaceChildren(h('p', { class: 'loading', text: 'CARGANDO...' }))
 
   const app = new App({ name, version: '1.0.0' }, {})
   app.ontoolresult = (result) => {
