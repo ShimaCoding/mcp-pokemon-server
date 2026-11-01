@@ -1,12 +1,13 @@
-"""MCP server implementation using FastMCP."""
+"""MCP server implementation using MCPServer (MCP Python SDK v2)."""
 
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import GetPromptResult, PromptMessage, TextContent
 
+from .. import __version__
 from ..cache.redis_cache import close_redis_cache, init_redis_cache
 from ..clients.pokeapi_client import PokemonAPIClient, set_pokemon_client
 from ..config.logging import get_logger, setup_logging
@@ -30,7 +31,7 @@ battle_prompts = BattlePromptManager(pokemon_client)
 
 
 @asynccontextmanager
-async def lifespan(server: FastMCP) -> AsyncGenerator[None, None]:
+async def lifespan(server: MCPServer) -> AsyncGenerator[None, None]:
     """Manage server lifecycle: start and close the HTTP client and Redis cache."""
     logger.info("[SERVER] Startup")
     await pokemon_client.start()
@@ -45,11 +46,10 @@ async def lifespan(server: FastMCP) -> AsyncGenerator[None, None]:
         await pokemon_client.close()
 
 
-# Create FastMCP server instance
-app = FastMCP(
+# Create MCP server instance (host/port are transport options in SDK v2, see run_server)
+app = MCPServer(
     "Pokemon MCP Server",
-    host=settings.server_host,
-    port=settings.server_port,
+    version=__version__,
     lifespan=lifespan,
 )
 
@@ -488,7 +488,7 @@ async def team_preview_prompt(
         )
 
 
-async def create_server() -> FastMCP:
+async def create_server() -> MCPServer:
     """Create and configure the MCP server."""
     logger.info(
         "Creating MCP server", server_name="Pokemon MCP Server", version="0.1.0"
@@ -509,8 +509,10 @@ def run_server() -> None:
         else:
             import uvicorn
 
+            # Passing the real bind host keeps DNS rebinding protection off, as in v1;
+            # with the default (127.0.0.1) public Host headers would get 421.
             uvicorn.run(
-                app.streamable_http_app(),
+                app.streamable_http_app(host=settings.server_host),
                 host=settings.server_host,
                 port=settings.server_port,
                 workers=settings.uvicorn_workers,

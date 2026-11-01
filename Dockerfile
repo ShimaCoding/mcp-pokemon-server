@@ -31,13 +31,17 @@ RUN apt-get update && apt-get upgrade -y && \
 
 WORKDIR /app
 
-# Copy dependency files first (layer caching optimization)
-COPY pyproject.toml README.md ./
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /usr/local/bin/uv
 
-# Install Python dependencies with BuildKit cache mount
+# Copy dependency files first (layer caching optimization)
+COPY pyproject.toml uv.lock README.md ./
+
+# Install the exact versions from uv.lock, then the project itself without re-resolving
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip setuptools wheel && \
-    pip install .
+    uv export --frozen --no-dev --no-emit-project --no-hashes -o /tmp/requirements.lock && \
+    pip install -r /tmp/requirements.lock && \
+    pip install --no-deps .
 
 # ---------------------------------------------------------------------------
 # Stage 2: Production — minimal runtime image
