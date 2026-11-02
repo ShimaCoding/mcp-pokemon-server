@@ -3,11 +3,13 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 from mcp.server.apps import Apps
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.prompts.base import Message, UserMessage
 from mcp.types import CallToolResult, GetPromptResult, TextContent
+from pydantic import Field
 
 from .. import __version__
 from ..cache.redis_cache import close_redis_cache, init_redis_cache
@@ -18,7 +20,13 @@ from ..models.response_models import ToolResult
 from ..prompts.battle_prompts import BattlePromptManager
 from ..prompts.educational_prompts import EducationalPromptManager
 from ..resources.pokemon_resources import PokemonResourceManager
-from ..tools.pokemon_tools import POKEMON_TOOLS
+from ..tools.pokemon_tools import (
+    COMPARE_MAX_POKEMON,
+    COMPARE_MIN_POKEMON,
+    POKEMON_TOOLS,
+    TEAM_MAX_SIZE,
+    TEAM_MIN_SIZE,
+)
 from ..widgets import (
     CARD_URI,
     SEARCH_URI,
@@ -136,16 +144,43 @@ async def get_pokedex_entry(pokemon: str) -> CallToolResult:
         return _tool_error("get_pokedex_entry", e)
 
 
-@apps.tool(resource_uri=STATS_URI)
-async def compare_pokemon(pokemon_names: list[str]) -> CallToolResult:
-    """Compare the base stats of 2–6 Pokémon side by side.
+# `pokemon_names` advertises its size bounds in `tools/list`. They go in
+# `json_schema_extra` rather than `min_length`/`max_length` so out-of-range lists
+# still reach the tool, which answers with an actionable error instead of
+# pydantic's generic validation message.
+CompareNames = Annotated[
+    list[str],
+    Field(
+        description=f"List of {COMPARE_MIN_POKEMON}–{COMPARE_MAX_POKEMON} Pokémon "
+        "names or Pokédex IDs.",
+        json_schema_extra={
+            "minItems": COMPARE_MIN_POKEMON,
+            "maxItems": COMPARE_MAX_POKEMON,
+        },
+    ),
+]
+TeamNames = Annotated[
+    list[str],
+    Field(
+        description=f"List of {TEAM_MIN_SIZE}–{TEAM_MAX_SIZE} Pokémon names or "
+        "Pokédex IDs.",
+        json_schema_extra={"minItems": TEAM_MIN_SIZE, "maxItems": TEAM_MAX_SIZE},
+    ),
+]
 
-    Returns a markdown table with HP, Attack, Defense, Sp. Atk, Sp. Def, Speed
-    and total for each Pokémon, plus which one leads each stat.
 
-    Args:
-        pokemon_names: List of 2–6 Pokémon names or Pokédex IDs.
-    """
+@apps.tool(
+    resource_uri=STATS_URI,
+    description=(
+        f"Compare base stats of {COMPARE_MIN_POKEMON}–{COMPARE_MAX_POKEMON} "
+        f"Pokémon side by side. For more than {COMPARE_MAX_POKEMON}, call this "
+        "tool multiple times in batches.\n\n"
+        "Returns a markdown table with HP, Attack, Defense, Sp. Atk, Sp. Def, "
+        "Speed and total for each Pokémon, plus which one leads each stat."
+    ),
+)
+async def compare_pokemon(pokemon_names: CompareNames) -> CallToolResult:
+    """Compare the base stats of several Pokémon (description set above)."""
     logger.info("[TOOL] compare_pokemon", pokemon=pokemon_names)
 
     try:
@@ -189,17 +224,19 @@ async def get_type_effectiveness(attacking_type: str) -> CallToolResult:
         return _tool_error("get_type_effectiveness", e)
 
 
-@apps.tool(resource_uri=TEAM_URI)
-async def analyze_team(pokemon_names: list[str]) -> CallToolResult:
-    """Analyze a team of 2–6 Pokémon fetched in parallel.
-
-    Returns a JSON object with per-member data (types, base stats, BST, battle
-    roles) plus team-wide metrics: average BST, type coverage, fastest/
-    strongest/bulkiest members, and role distribution.
-
-    Args:
-        pokemon_names: List of 2–6 Pokémon names or Pokédex IDs.
-    """
+@apps.tool(
+    resource_uri=TEAM_URI,
+    description=(
+        f"Analyze a team of {TEAM_MIN_SIZE}–{TEAM_MAX_SIZE} Pokémon fetched in "
+        f"parallel (a team holds at most {TEAM_MAX_SIZE}). To compare more "
+        "Pokémon by stats, use compare_pokemon.\n\n"
+        "Returns a JSON object with per-member data (types, base stats, BST, "
+        "battle roles) plus team-wide metrics: average BST, type coverage, "
+        "fastest/strongest/bulkiest members, and role distribution."
+    ),
+)
+async def analyze_team(pokemon_names: TeamNames) -> CallToolResult:
+    """Analyze a team of Pokémon (description set above)."""
     logger.info("[TOOL] analyze_team", team=pokemon_names)
 
     try:
@@ -393,8 +430,8 @@ async def battle_strategy_prompt(
     """Battle strategy planning prompt.
 
     Args:
-        user_team: List of Pokemon names in user's team
-        opponent_team: Optional list of opponent's Pokemon
+        user_team: List of Pokemon names in user's team (up to 6; extras are ignored)
+        opponent_team: Optional list of opponent's Pokemon (up to 6; extras are ignored)
         battle_format: singles, doubles, or multi
         strategy_focus: offensive, defensive, balanced, or utility
     """
@@ -455,7 +492,7 @@ async def team_preview_prompt(
     """Team preview analysis prompt.
 
     Args:
-        team: List of Pokemon names to analyze
+        team: List of Pokemon names to analyze (up to 6; extras are ignored)
         analysis_depth: quick, standard, or comprehensive
         focus_areas: specific areas to focus on (offense, defense, synergy, etc.)
     """

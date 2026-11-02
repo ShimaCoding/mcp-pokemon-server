@@ -141,6 +141,7 @@ body { font-family: var(--font); color: var(--gbc-dark); font-size: 12px; line-h
 .legend-swatch { width: 10px; height: 10px; border: 2px solid var(--gbc-border); background: var(--series); }
 .legend-total { color: var(--gbc-mid); }
 
+.compare-wrap { overflow-x: auto; }
 .compare { width: 100%; border-collapse: collapse; font-size: 11px; }
 .compare th, .compare td { padding: 5px 8px; text-align: right; border: 1px solid var(--gbc-border); }
 .compare th:first-child, .compare td:first-child { text-align: left; }

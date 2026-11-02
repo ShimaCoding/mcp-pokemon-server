@@ -275,10 +275,97 @@ async def test_compare_pokemon_needs_two_valid(mock_client, bulbasaur):
     assert "missingno" in result.content[0]["text"]
 
 
-@pytest.mark.parametrize("names", [["bulbasaur"], ["a", "b", "c", "d", "e", "f", "g"]])
-async def test_compare_pokemon_size_limits(names):
+EEVEELUTIONS = {
+    "vaporeon": (134, ["water"], [130, 65, 60, 110, 95, 65]),
+    "jolteon": (135, ["electric"], [65, 65, 60, 110, 95, 130]),
+    "flareon": (136, ["fire"], [65, 130, 60, 95, 110, 65]),
+    "espeon": (196, ["psychic"], [65, 65, 60, 130, 95, 110]),
+    "umbreon": (197, ["dark"], [95, 65, 110, 60, 130, 65]),
+    "leafeon": (470, ["grass"], [65, 110, 130, 60, 65, 95]),
+    "glaceon": (471, ["ice"], [65, 60, 110, 130, 95, 65]),
+    "sylveon": (700, ["fairy"], [95, 65, 65, 110, 130, 60]),
+}
+EEVEE = {"eevee": (133, ["normal"], [55, 55, 50, 45, 65, 55])}
+# The call Dexter made in production (Datadog trace 6ae87f33...b8a1).
+EEVEELUTION_NAMES = [n.title() for n in EEVEELUTIONS]
+
+
+@pytest.fixture
+def eevee_client():
+    dex = {
+        name: make_pokemon(pid, name, types, stats)
+        for name, (pid, types, stats) in {**EEVEE, **EEVEELUTIONS}.items()
+    }
+    client = AsyncMock()
+    client.get_multiple_pokemon.side_effect = lambda names: [
+        dex[n] for n in names if n in dex
+    ]
+    with patch(
+        "src.tools.pokemon_tools.get_pokemon_client", AsyncMock(return_value=client)
+    ):
+        yield client
+
+
+@pytest.mark.parametrize(
+    "names", [EEVEELUTION_NAMES, ["Eevee", *EEVEELUTION_NAMES]], ids=["8", "9"]
+)
+async def test_compare_pokemon_eeveelutions(eevee_client, names):
+    result = await app.call_tool("compare_pokemon", {"pokemon_names": names})
+    assert not result.is_error
+    assert [p["name"] for p in result.structured_content["pokemon"]] == [
+        n.lower() for n in names
+    ]
+    text = result.content[0].text
+    rows = [line for line in text.splitlines() if line.startswith("| ")]
+    assert len(rows) == len(names) + 1  # header + one row per Pokémon
+    assert "| Vaporeon | 130 | 65 | 60 | 110 | 95 | 65 | 525 |" in text
+    assert "HP: Vaporeon" in text and "Spe: Jolteon" in text
+    assert "Not found" not in text
+
+
+async def test_compare_pokemon_too_few():
+    result = await app.call_tool("compare_pokemon", {"pokemon_names": ["eevee"]})
+    assert result.is_error
+    assert result.structured_content is None
+    text = result.content[0].text
+    assert "compare_pokemon accepts 2–9 Pokémon, got 1." in text
+    assert "Add at least 1 more" in text
+
+
+async def test_compare_pokemon_too_many_suggests_batches():
+    names = ["Eevee", *EEVEELUTION_NAMES, "Pikachu"]
+    result = await app.call_tool("compare_pokemon", {"pokemon_names": names})
+    assert result.is_error
+    assert result.structured_content is None
+    text = result.content[0].text
+    assert "compare_pokemon accepts 2–9 Pokémon, got 10." in text
+    assert "Split into batches of ≤9" in text
+    # Balanced so no batch falls under the minimum (5 + 5, not 9 + 1).
+    assert json.dumps(names[:5]) in text
+    assert json.dumps(names[5:]) in text
+
+
+@pytest.mark.parametrize("count, sizes", [(10, [5, 5]), (11, [6, 5]), (19, [7, 6, 6])])
+async def test_compare_pokemon_batches_are_valid(count, sizes):
+    names = [f"p{i}" for i in range(count)]
     result = await compare_pokemon(names)
     assert result.is_error
+    text = result.content[0]["text"]
+    batches = json.loads("[" + text.split("once per batch: ")[1] + "]")
+    assert [len(b) for b in batches] == sizes
+    assert [n for b in batches for n in b] == names
+
+
+async def test_list_tools_exposes_list_bounds():
+    tools = {t.name: t for t in await app.list_tools()}
+    for name, (lo, hi) in {"compare_pokemon": (2, 9), "analyze_team": (2, 6)}.items():
+        param = tools[name].input_schema["properties"]["pokemon_names"]
+        assert (param["minItems"], param["maxItems"]) == (lo, hi)
+        assert f"{lo}–{hi}" in param["description"]
+        assert f"{lo}–{hi} Pokémon" in tools[name].description
+    assert "call this tool multiple times in batches" in (
+        tools["compare_pokemon"].description
+    )
 
 
 # --- Prompts ---------------------------------------------------------------
