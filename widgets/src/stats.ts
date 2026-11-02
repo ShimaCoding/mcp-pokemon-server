@@ -14,8 +14,19 @@ interface StatsData {
   pokemon: StatsEntry[]
 }
 
-// Distinct hues that hold up on light and dark backgrounds.
-const SERIES = ['#e5484d', '#3e7bfa', '#30a46c', '#f5a524', '#8e4ec6', '#12a594']
+// Distinct hues that hold up on light and dark backgrounds, one per Pokémon
+// (compare_pokemon accepts up to COMPARE_MAX_POKEMON = 9).
+const SERIES = [
+  '#e5484d',
+  '#3e7bfa',
+  '#30a46c',
+  '#f5a524',
+  '#8e4ec6',
+  '#12a594',
+  '#e93d82',
+  '#ad7f58',
+  '#8db600',
+]
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
@@ -102,7 +113,10 @@ function compareTable(entries: StatsEntry[], colors: string[]): HTMLElement {
       }),
     ]),
   )
-  return h('table', { class: 'compare' }, [h('thead', {}, [head]), h('tbody', {}, rows)])
+  // Up to 9 Pokémon columns: scroll sideways instead of overflowing narrow hosts.
+  return h('div', { class: 'compare-wrap' }, [
+    h('table', { class: 'compare' }, [h('thead', {}, [head]), h('tbody', {}, rows)]),
+  ])
 }
 
 function render(root: HTMLElement, data: StatsData): void {

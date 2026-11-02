@@ -16,6 +16,12 @@ _SPRITE_URL = (
     "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{id}.png"
 )
 
+# List-size bounds, shared by the validation below and the tools' input schema.
+COMPARE_MIN_POKEMON = 2
+COMPARE_MAX_POKEMON = 9  # Eevee plus its 8 evolutions
+TEAM_MIN_SIZE = 2
+TEAM_MAX_SIZE = 6  # a Pokémon team holds at most 6
+
 
 def _sorted_types(pokemon: Pokemon) -> list[str]:
     return [t.type["name"] for t in sorted(pokemon.types, key=lambda x: x.slot)]
@@ -611,18 +617,20 @@ async def analyze_team(pokemon_names: list[str]) -> ToolResult:
     BST, type coverage, fastest/strongest/bulkiest members, and role distribution.
 
     Args:
-        pokemon_names: List of 2–6 Pokémon names or Pokédex IDs.
+        pokemon_names: List of TEAM_MIN_SIZE–TEAM_MAX_SIZE Pokémon names or
+            Pokédex IDs.
 
     Returns:
         ToolResult whose text content is a JSON object with the full team
         analysis, or an error message on failure.
     """
-    if not 2 <= len(pokemon_names) <= 6:
+    if not TEAM_MIN_SIZE <= len(pokemon_names) <= TEAM_MAX_SIZE:
         return ToolResult(
             content=[
                 {
                     "type": "text",
-                    "text": "❌ A team must have between 2 and 6 Pokémon.",
+                    "text": f"❌ A team must have between {TEAM_MIN_SIZE} and "
+                    f"{TEAM_MAX_SIZE} Pokémon.",
                 }
             ],
             is_error=True,
@@ -738,24 +746,57 @@ _STAT_LABELS = {
 }
 
 
+def _compare_batches(names: list[str]) -> list[list[str]]:
+    """Split ``names`` into the fewest balanced batches that compare_pokemon accepts.
+
+    Balancing (10 -> 5 + 5 rather than 9 + 1) keeps every batch above the minimum.
+    """
+    count = -(-len(names) // COMPARE_MAX_POKEMON)
+    size, extra = divmod(len(names), count)
+    batches: list[list[str]] = []
+    start = 0
+    for i in range(count):
+        end = start + size + (1 if i < extra else 0)
+        batches.append(names[start:end])
+        start = end
+    return batches
+
+
+def _compare_size_error(pokemon_names: list[str]) -> str:
+    got = len(pokemon_names)
+    text = (
+        f"❌ compare_pokemon accepts {COMPARE_MIN_POKEMON}–{COMPARE_MAX_POKEMON} "
+        f"Pokémon, got {got}."
+    )
+    if got < COMPARE_MIN_POKEMON:
+        return (
+            f"{text} Add at least {COMPARE_MIN_POKEMON - got} more to compare "
+            "against, or use analyze_pokemon_stats for a single Pokémon."
+        )
+    batches = ", ".join(
+        json.dumps(b, ensure_ascii=False)
+        for b in _compare_batches([str(n) for n in pokemon_names])
+    )
+    return (
+        f"{text} Split into batches of ≤{COMPARE_MAX_POKEMON} and call "
+        f"compare_pokemon once per batch: {batches}"
+    )
+
+
 async def compare_pokemon(pokemon_names: list[str]) -> ToolResult:
-    """Compare the base stats of 2–6 Pokémon side by side.
+    """Compare the base stats of 2–9 Pokémon side by side.
 
     Args:
-        pokemon_names: List of 2–6 Pokémon names or Pokédex IDs.
+        pokemon_names: List of COMPARE_MIN_POKEMON–COMPARE_MAX_POKEMON Pokémon
+            names or Pokédex IDs.
 
     Returns:
         ToolResult with a markdown stats table for the LLM and a
         ``{"pokemon": [...]}`` payload for the stats widget.
     """
-    if not 2 <= len(pokemon_names) <= 6:
+    if not COMPARE_MIN_POKEMON <= len(pokemon_names) <= COMPARE_MAX_POKEMON:
         return ToolResult(
-            content=[
-                {
-                    "type": "text",
-                    "text": "❌ Compare between 2 and 6 Pokémon.",
-                }
-            ],
+            content=[{"type": "text", "text": _compare_size_error(pokemon_names)}],
             is_error=True,
         )
 
