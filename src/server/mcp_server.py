@@ -29,6 +29,7 @@ from ..tools.pokemon_tools import (
 )
 from ..widgets import (
     CARD_URI,
+    EVOLUTION_URI,
     SEARCH_URI,
     STATS_URI,
     TEAM_URI,
@@ -142,6 +143,37 @@ async def get_pokedex_entry(pokemon: str) -> CallToolResult:
         return _call_tool_result(await POKEMON_TOOLS["get_pokedex_entry"](pokemon))
     except Exception as e:
         return _tool_error("get_pokedex_entry", e)
+
+
+@apps.tool(
+    resource_uri=EVOLUTION_URI,
+    description=(
+        "Get the evolution line (línea evolutiva) of a Pokémon as a tree: what a "
+        "Pokémon evolves into (¿en qué evoluciona?), who it evolves from "
+        "(¿de quién evoluciona?), and how (level, item, friendship, trade, time "
+        "of day, location...). Use it for ANY question about evolution, "
+        "evolutions, pre-evolutions, baby Pokémon or branching evolutions (e.g. "
+        "Eevee), instead of answering from memory.\n\n"
+        "Returns a JSON tree: each node has name, id, types, total_bst, sprite, "
+        "is_baby, via (every way of evolving into it) and evolves_to; the "
+        "queried species has queried=true. A Pokémon that does not evolve "
+        "returns a single node. `evolutions` lists every step as "
+        "'from -> to (conditions)'."
+    ),
+)
+async def get_evolution_chain(pokemon: str) -> CallToolResult:
+    """Get the evolution line of a Pokémon (description set above).
+
+    Args:
+        pokemon: Pokémon name (e.g. 'eevee') or Pokédex number (e.g. '133').
+                 Any member of the line works.
+    """
+    logger.info("[TOOL] get_evolution_chain", identifier=pokemon)
+
+    try:
+        return _call_tool_result(await POKEMON_TOOLS["get_evolution_chain"](pokemon))
+    except Exception as e:
+        return _tool_error("get_evolution_chain", e)
 
 
 # `pokemon_names` advertises its size bounds in `tools/list`. They go in

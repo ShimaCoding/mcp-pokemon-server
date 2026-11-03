@@ -536,6 +536,50 @@ async def test_get_pokedex_entry_fallback_to_english(sample_pokemon_with_species
         assert data["evolution_chain"] is None  # no evolution_chain URL in species
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "genera, expected",
+    [
+        (
+            [
+                {"genus": "Ratón eléctrico", "language": {"name": "es"}},
+                {"genus": "Mouse Pokémon", "language": {"name": "en"}},
+            ],
+            ("Ratón eléctrico", "es"),
+        ),
+        # Gen IX: PokéAPI only has English; it is flagged, not passed off as Spanish.
+        (
+            [{"genus": "Olive Pokémon", "language": {"name": "en"}}],
+            ("Olive Pokémon", "en"),
+        ),
+        ([], (None, None)),
+    ],
+    ids=["es", "en-fallback", "none"],
+)
+async def test_get_pokedex_entry_genus_lang(
+    sample_pokemon_with_species, genera, expected
+):
+    import json
+
+    species = PokemonSpecies(
+        id=25,
+        name="pikachu",
+        color={"name": "yellow", "url": ""},
+        generation={"name": "generation-i", "url": ""},
+        is_legendary=False,
+        is_mythical=False,
+        genera=genera,
+    )
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        api = AsyncMock()
+        api.get_pokemon.return_value = sample_pokemon_with_species
+        api.get_pokemon_species.return_value = species
+        mock_client.return_value = api
+        result = await get_pokedex_entry("pikachu")
+    data = json.loads(result.content[0]["text"])
+    assert (data["genus"], data["genus_lang"]) == expected
+
+
 # ---------------------------------------------------------------------------
 # analyze_team tests
 # ---------------------------------------------------------------------------

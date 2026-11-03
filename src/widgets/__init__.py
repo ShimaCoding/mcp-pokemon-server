@@ -15,6 +15,7 @@ STATS_URI = "ui://pokedex/stats.html"
 TYPES_URI = "ui://pokedex/types.html"
 TEAM_URI = "ui://pokedex/team.html"
 SEARCH_URI = "ui://pokedex/search.html"
+EVOLUTION_URI = "ui://pokedex/evolution.html"
 
 _HTML_DIR = Path(__file__).parent / "html"
 
@@ -71,5 +72,13 @@ def register_widgets(apps: Apps) -> None:
         name="pokedex-search",
         title="Buscador Pokédex",
         description="Lista paginada de Pokémon; al hacer clic en uno se pide su ficha.",
+        csp=_CSP,
+    )
+    apps.add_html_resource(
+        EVOLUTION_URI,
+        _read("evolution.html"),
+        name="pokedex-evolution",
+        title="Línea evolutiva",
+        description="Cadena evolutiva con ramas y condiciones; al hacer clic en una etapa se pide su ficha.",
         csp=_CSP,
     )

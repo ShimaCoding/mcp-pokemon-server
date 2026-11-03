@@ -21,7 +21,14 @@ from src.tools.pokemon_tools import (
     stats_entry,
     type_chart,
 )
-from src.widgets import CARD_URI, SEARCH_URI, STATS_URI, TEAM_URI, TYPES_URI
+from src.widgets import (
+    CARD_URI,
+    EVOLUTION_URI,
+    SEARCH_URI,
+    STATS_URI,
+    TEAM_URI,
+    TYPES_URI,
+)
 
 STAT_NAMES = ["hp", "attack", "defense", "special-attack", "special-defense", "speed"]
 UI_TOOLS = {
@@ -32,6 +39,7 @@ UI_TOOLS = {
     "get_type_effectiveness": TYPES_URI,
     "analyze_team": TEAM_URI,
     "search_pokemon": SEARCH_URI,
+    "get_evolution_chain": EVOLUTION_URI,
 }
 WIDGET_URIS = sorted(set(UI_TOOLS.values()))
 

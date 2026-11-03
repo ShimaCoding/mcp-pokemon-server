@@ -17,6 +17,7 @@ Servidor MCP en producción construido con **FastMCP** y **PokéAPI**. Expone he
 | `get_type_effectiveness` | Tabla de efectividades de un tipo atacante |
 | `analyze_pokemon_stats` | Análisis de stats base con rating automático (Legendary / Strong / Average / Below Average) |
 | `get_pokedex_entry` | Entrada completa de la Pokédex: flavor text en español, generación, hábitat, captura, legendario/mítico |
+| `get_evolution_chain` | Línea evolutiva como árbol (`pokemon`): de quién evoluciona y en qué, con todas las condiciones (nivel, objeto, amistad, hora, lugar...), ramas y bebés |
 | `analyze_team` | Análisis completo de un equipo de 2-6 Pokémon: coverage de tipos, miembros más rápidos/fuertes/tankys, distribución de roles |
 
 ### Prompts

@@ -372,12 +372,10 @@ def _get_genus(genera: list[dict], lang: str) -> str:
     return ""
 
 
-def _parse_evolution_details(details: list[dict]) -> dict[str, Any]:
-    """Extract non-null evolution conditions from the first details entry."""
-    if not details:
-        return {}
-    d = details[0]
-    via: dict[str, Any] = {"trigger": d.get("trigger", {}).get("name", "unknown")}
+def _parse_evolution_detail(d: dict) -> dict[str, Any]:
+    """Extract the non-null conditions of ONE ``evolution_details`` entry."""
+    trigger = d.get("trigger") or {}
+    via: dict[str, Any] = {"trigger": trigger.get("name", "unknown")}
     if d.get("min_level"):
         via["min_level"] = d["min_level"]
     if d.get("min_happiness"):
@@ -408,7 +406,48 @@ def _parse_evolution_details(details: list[dict]) -> dict[str, Any]:
     relative_stats = d.get("relative_physical_stats")
     if relative_stats is not None:
         via["relative_physical_stats"] = relative_stats
+    # Conditions below are rarer (trade partners, party requirements, newer games).
+    for key in ("party_species", "party_type", "trade_species", "used_move", "region"):
+        if d.get(key):
+            via[key] = d[key]["name"]
+    for key in ("min_move_count", "min_steps", "min_damage_taken"):
+        if d.get(key):
+            via[key] = d[key]
+    if d.get("near_special_rock"):
+        via["near_special_rock"] = True
+    if d.get("evolved_pokemon_form"):
+        via["evolved_form"] = d["evolved_pokemon_form"]["name"]
+    chance = (d.get("condition_expression") or {}).get("percentage_chance")
+    if chance is not None:
+        via["chance_percent"] = chance
     return via
+
+
+def _parse_evolution_details(details: list[dict]) -> dict[str, Any]:
+    """Conditions of the FIRST details entry (compact form used by the flat chain).
+
+    ``get_evolution_chain`` keeps every entry instead; see ``_parse_all_evolution_details``.
+    """
+    if not details:
+        return {}
+    return _parse_evolution_detail(details[0])
+
+
+def _parse_all_evolution_details(details: list[dict]) -> list[dict[str, Any]]:
+    """Conditions of ALL entries, tagged with the game version they come from.
+
+    PokéAPI lists one entry per way (or per game generation) of evolving, e.g.
+    Leafeon has one per Eevee-evolving location plus the Leaf Stone.
+    """
+    result = []
+    for d in details:
+        via = _parse_evolution_detail(d)
+        if d.get("version_group"):
+            via["version_group"] = d["version_group"]["name"]
+        if "is_default" in d:
+            via["is_default"] = bool(d["is_default"])
+        result.append(via)
+    return result
 
 
 def _flatten_chain(node: dict) -> list[dict]:
@@ -567,12 +606,18 @@ async def get_pokedex_entry(name_or_id: str) -> ToolResult:
         else "unknown"
     )
 
+    # PokéAPI has no Spanish genus for the newest generations; the English
+    # fallback is flagged so the narrator doesn't mix it into Spanish prose.
+    genus_es = _get_genus(species.genera, "es")
+    genus_en = "" if genus_es else _get_genus(species.genera, "en")
+    genus = genus_es or genus_en or None
+    genus_lang = "es" if genus_es else ("en" if genus_en else None)
+
     entry = {
         "id": pokemon.id,
         "name": pokemon.name,
-        "genus": _get_genus(species.genera, "es")
-        or _get_genus(species.genera, "en")
-        or None,
+        "genus": genus,
+        "genus_lang": genus_lang,
         "height_dm": pokemon.height,
         "weight_hg": pokemon.weight,
         "color": species.color.get("name") if species.color else None,
@@ -606,6 +651,156 @@ async def get_pokedex_entry(name_or_id: str) -> ToolResult:
     return ToolResult(
         content=[{"type": "text", "text": json.dumps(entry, ensure_ascii=False)}],
         structured_content=card,
+    )
+
+
+def _species_id(node: dict) -> int | None:
+    """Pokédex number of a chain node, from its species URL."""
+    try:
+        return int(str(node["species"]["url"]).strip("/").split("/")[-1])
+    except (KeyError, ValueError):
+        return None
+
+
+def _chain_nodes(node: dict) -> list[dict]:
+    nodes = [node]
+    for child in node.get("evolves_to", []):
+        nodes.extend(_chain_nodes(child))
+    return nodes
+
+
+def _via_text(via: dict[str, Any]) -> str:
+    """Short English description of one evolution condition (for the LLM)."""
+    parts = [str(via.get("trigger", "unknown"))]
+    for key, value in via.items():
+        if key in ("trigger", "version_group", "is_default"):
+            continue
+        parts.append(key if value is True else f"{key}={value}")
+    return " ".join(parts)
+
+
+def _evolution_node(
+    node: dict, queried: str, pokemon_by_id: dict[int, Pokemon]
+) -> dict[str, Any]:
+    """Build one tree node (and, recursively, its ``evolves_to``)."""
+    name = node.get("species", {}).get("name", "")
+    sid = _species_id(node)
+    pokemon = pokemon_by_id.get(sid) if sid is not None else None
+    sprite = pokemon.sprites.front_default if pokemon else None
+    return {
+        "name": name,
+        "id": sid,
+        "types": _sorted_types(pokemon) if pokemon else [],
+        "total_bst": sum(s.base_stat for s in pokemon.stats) if pokemon else None,
+        "sprite": (
+            str(sprite) if sprite else (_SPRITE_URL.format(id=sid) if sid else None)
+        ),
+        "is_baby": bool(node.get("is_baby")),
+        "queried": name == queried,
+        "via": _parse_all_evolution_details(node.get("evolution_details") or []),
+        "evolves_to": [
+            _evolution_node(child, queried, pokemon_by_id)
+            for child in node.get("evolves_to", [])
+        ],
+    }
+
+
+def _evolution_edges(tree: dict[str, Any]) -> list[str]:
+    """One ``from -> to (conditions)`` line per evolution in the tree."""
+    edges: list[str] = []
+    for child in tree["evolves_to"]:
+        # Current-game entries only: ``via`` keeps the per-generation history.
+        current = [v for v in child["via"] if v.get("is_default")] or child["via"]
+        conditions = " OR ".join(dict.fromkeys(_via_text(v) for v in current))
+        edges.append(f"{tree['name']} -> {child['name']} ({conditions})")
+        edges.extend(_evolution_edges(child))
+    return edges
+
+
+def _tree_depth(tree: dict[str, Any]) -> int:
+    return 1 + max((_tree_depth(c) for c in tree["evolves_to"]), default=0)
+
+
+async def get_evolution_chain(pokemon: str) -> ToolResult:
+    """Get the full evolution line of a Pokémon as a tree.
+
+    Answers "what does X evolve into?", "who does X evolve from?" and "show me
+    the evolution line of X". Each node carries name, id, types, total_bst,
+    sprite, is_baby, ``via`` (every way of reaching it: trigger, level, item,
+    happiness, time of day, location, ...) and ``evolves_to``. The queried
+    species is flagged ``queried: true``. A Pokémon that does not evolve
+    returns a single node.
+
+    Args:
+        pokemon: Pokémon name or Pokédex number; any form of the line works.
+
+    Returns:
+        ToolResult whose text content is the JSON tree, or an error message.
+    """
+    try:
+        client = await get_pokemon_client()
+        found = await client.get_pokemon(pokemon)
+        # Resolve through the species URL so alternate forms map to their species.
+        if found.species and found.species.get("url"):
+            species_id = str(found.species["url"]).strip("/").split("/")[-1]
+        else:
+            species_id = str(found.id)
+        species = await client.get_pokemon_species(species_id)
+
+        root: dict | None = None
+        if species.evolution_chain and species.evolution_chain.get("url"):
+            chain_data = await client.get_evolution_chain(
+                species.evolution_chain["url"]
+            )
+            root = chain_data.get("chain") or None
+        if root is None:  # species without a chain: a single node
+            root = {
+                "species": {
+                    "name": species.name,
+                    "url": f"https://pokeapi.co/api/v2/pokemon-species/{species.id}/",
+                },
+                "is_baby": False,
+                "evolution_details": [],
+                "evolves_to": [],
+            }
+
+        # Fetch by Pokédex number: many species names (wormadam, darmanitan,
+        # meowstic...) are not valid Pokémon names in PokéAPI.
+        ids = [i for i in (_species_id(n) for n in _chain_nodes(root)) if i is not None]
+        try:
+            members = await client.get_multiple_pokemon([str(i) for i in ids])
+        except Exception:
+            logger.warning("Failed to enrich evolution chain", identifier=pokemon)
+            members = []
+        tree = _evolution_node(root, species.name, {p.id: p for p in members})
+    except PokemonNotFoundError:
+        return ToolResult(
+            content=[
+                {
+                    "type": "text",
+                    "text": f"❌ Pokémon '{pokemon}' not found. Please check the name or ID.",
+                }
+            ],
+            is_error=True,
+        )
+    except Exception as e:
+        logger.error("Error fetching evolution chain", identifier=pokemon, error=str(e))
+        return ToolResult(
+            content=[
+                {"type": "text", "text": f"❌ Error retrieving evolution chain: {e}"}
+            ],
+            is_error=True,
+        )
+
+    payload = {
+        "queried": species.name,
+        "stages": _tree_depth(tree),
+        "root": tree,
+        "evolutions": _evolution_edges(tree),
+    }
+    return ToolResult(
+        content=[{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}],
+        structured_content=payload,
     )
 
 
@@ -858,6 +1053,7 @@ POKEMON_TOOLS = {
     "get_type_effectiveness": get_type_effectiveness,
     "analyze_pokemon_stats": analyze_pokemon_stats,
     "get_pokedex_entry": get_pokedex_entry,
+    "get_evolution_chain": get_evolution_chain,
     "analyze_team": analyze_team,
     "compare_pokemon": compare_pokemon,
 }
