@@ -706,3 +706,132 @@ async def test_analyze_team_partial_failure():
         data = json.loads(result.content[0]["text"])
         assert data["team_size"] == 1
         assert "fakemon" in data["not_found"]
+
+
+# ---------------------------------------------------------------------------
+# analyze_team defense (pokemon-agent#46)
+# ---------------------------------------------------------------------------
+
+from src.tools.pokemon_tools import defensive_profile, team_weaknesses  # noqa: E402
+
+
+def _rel(double=(), half=(), none=()):
+    def names(ts):
+        return [{"name": t, "url": ""} for t in ts]
+
+    return {
+        "double_damage_from": names(double),
+        "half_damage_from": names(half),
+        "no_damage_from": names(none),
+    }
+
+
+# Subset of the PokeAPI chart, enough for Torterra (grass/ground) and friends.
+RELATIONS = {
+    "grass": _rel(
+        double=("flying", "poison", "bug", "fire", "ice"),
+        half=("ground", "water", "grass", "electric"),
+    ),
+    "ground": _rel(
+        double=("water", "grass", "ice"), half=("poison", "rock"), none=("electric",)
+    ),
+    "normal": _rel(double=("fighting",), none=("ghost",)),
+    "flying": _rel(
+        double=("rock", "electric", "ice"),
+        half=("grass", "fighting", "bug"),
+        none=("ground",),
+    ),
+    "fire": _rel(
+        double=("ground", "rock", "water"),
+        half=("bug", "steel", "fire", "grass", "ice", "fairy"),
+    ),
+}
+
+
+def test_defensive_profile_torterra():
+    d = defensive_profile(["grass", "ground"], RELATIONS)
+    # Issue #46: the agent claimed "inmune a Agua" and "débil a Lucha".
+    assert d["weak_to"] == {"bug": 2, "fire": 2, "flying": 2, "ice": 4}
+    assert d["immune_to"] == ["electric"]
+    assert (
+        "water" not in d["weak_to"] and "water" not in d["resists"]
+    )  # 2 x 0.5 = neutral
+    assert "fighting" not in d["weak_to"]
+    assert d["resists"] == {"ground": 0.5, "rock": 0.5}
+
+
+def test_defensive_profile_cancels_and_immunity_wins():
+    d = defensive_profile(["normal", "flying"], RELATIONS)
+    assert d["immune_to"] == ["ghost", "ground"]
+    assert "fighting" not in d["weak_to"]  # 2 x 0.5
+    assert d["weak_to"] == {"electric": 2, "ice": 2, "rock": 2}
+
+
+def test_team_weaknesses_lists_types_that_hit_two_or_more():
+    members = [
+        {"name": n, "defense": defensive_profile(t, RELATIONS)}
+        for n, t in [
+            ("torterra", ["grass", "ground"]),
+            ("pidgey", ["normal", "flying"]),
+            ("charmander", ["fire"]),
+        ]
+    ]
+    shared = team_weaknesses(members)
+    by_type = {e["type"]: e for e in shared}
+    assert by_type["ice"]["weak"] == ["torterra", "pidgey"]
+    assert by_type["ice"]["resist"] == ["charmander"]
+    assert by_type["rock"]["weak"] == ["pidgey", "charmander"]
+    assert "fire" not in by_type  # only torterra is weak to fire
+    assert shared[0]["type"] in {"ice", "rock"}
+
+
+@pytest.mark.asyncio
+async def test_analyze_team_includes_defense():
+    import json
+
+    torterra = _make_pokemon(389, "torterra", "grass", 95, 109, 105, 75, 85, 56)
+    charmander = _make_pokemon(4, "charmander", "fire", 39, 52, 43, 60, 50, 65)
+
+    async def type_data(name):
+        return {"name": name, "damage_relations": RELATIONS[name]}
+
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        api = AsyncMock()
+        api.get_multiple_pokemon = AsyncMock(return_value=[torterra, charmander])
+        api.get_type_data = AsyncMock(side_effect=type_data)
+        mock_client.return_value = api
+
+        result = await analyze_team(["torterra", "charmander"])
+
+    data = json.loads(result.content[0]["text"])
+    tort = next(m for m in data["members"] if m["name"] == "torterra")
+    assert tort["defense"]["weak_to"]["fire"] == 2
+    assert {e["type"] for e in data["team_analysis"]["shared_weaknesses"]} <= {
+        "ice",
+        "rock",
+        "water",
+        "ground",
+    }
+    assert (
+        result.structured_content["team_analysis"]["shared_weaknesses"]
+        == data["team_analysis"]["shared_weaknesses"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_analyze_team_without_type_data_still_works():
+    import json
+
+    torterra = _make_pokemon(389, "torterra", "grass", 95, 109, 105, 75, 85, 56)
+    charmander = _make_pokemon(4, "charmander", "fire", 39, 52, 43, 60, 50, 65)
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        api = AsyncMock()
+        api.get_multiple_pokemon = AsyncMock(return_value=[torterra, charmander])
+        api.get_type_data = AsyncMock(side_effect=RuntimeError("pokeapi down"))
+        mock_client.return_value = api
+        result = await analyze_team(["torterra", "charmander"])
+
+    assert not result.is_error
+    data = json.loads(result.content[0]["text"])
+    assert "defense" not in data["members"][0]
+    assert "shared_weaknesses" not in data["team_analysis"]
