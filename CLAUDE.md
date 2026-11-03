@@ -43,7 +43,7 @@ make stop && make clean          # Stop and remove everything
 
 The server uses **FastMCP** to expose three MCP primitives:
 
-- **Tools** (`src/tools/pokemon_tools.py`): 7 callable tools — `get_pokemon_info`, `search_pokemon`, `get_type_effectiveness`, `analyze_pokemon_stats`, `analyze_team`, `get_pokedex_entry`, `compare_pokemon`
+- **Tools** (`src/tools/pokemon_tools.py`): 8 callable tools — `get_pokemon_info`, `search_pokemon`, `get_type_effectiveness`, `analyze_pokemon_stats`, `analyze_team`, `get_pokedex_entry`, `compare_pokemon`, `get_evolution_chain`
 - **Resources** (`src/resources/pokemon_resources.py`): Dynamic URI patterns — `pokemon://info/{name}`, `pokemon://stats/{name}`, `pokemon://type/{type}`, `pokemon://comparison/{name1}/{name2}`
 - **Prompts** (`src/prompts/`): 6 prompt templates split into educational (`educational_prompts.py`) and battle strategy (`battle_prompts.py`)
 
@@ -66,6 +66,7 @@ The server uses the SDK's `mcp.server.apps.Apps` extension. Every tool is bound 
 | `ui://pokedex/types.html` | `get_type_effectiveness` | `type_chart()`: attack/defense multipliers |
 | `ui://pokedex/team.html` | `analyze_team` | members (`stats_entry()` + roles), `team_analysis`, `not_found` |
 | `ui://pokedex/search.html` | `search_pokemon` | `count`, `limit`, `offset`, `results` |
+| `ui://pokedex/evolution.html` | `get_evolution_chain` | `queried`, `stages`, `root` (tree: name/id/types/total_bst/sprite/is_baby/queried/via[]/evolves_to), `evolutions` |
 
 The search widget is interactive: clicking a Pokémon calls `app.sendMessage` (the host posts it to the chat) and paging calls `app.callServerTool("search_pokemon")`.
 
