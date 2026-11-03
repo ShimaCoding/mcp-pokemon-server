@@ -1,5 +1,6 @@
 """Basic Pokemon tools for MCP server."""
 
+import asyncio
 import json
 from collections import Counter
 from typing import Any
@@ -804,6 +805,70 @@ async def get_evolution_chain(pokemon: str) -> ToolResult:
     )
 
 
+def defensive_profile(
+    types: list[str], relations: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    """Damage multipliers taken by a Pokémon of ``types`` (``relations``: type → damage_relations).
+
+    Returns ``weak_to`` (type → 2 or 4), ``resists`` (type → 0.5 or 0.25) and ``immune_to``,
+    each sorted by type name. Pure.
+    """
+    mult: dict[str, float] = {}
+    for own in types:
+        rel = relations.get(own) or {}
+        for key, factor in (
+            ("double_damage_from", 2.0),
+            ("half_damage_from", 0.5),
+            ("no_damage_from", 0.0),
+        ):
+            for t in rel.get(key, []):
+                mult[t["name"]] = mult.get(t["name"], 1.0) * factor
+    weak = {t: int(m) for t, m in sorted(mult.items()) if m > 1}
+    resists = {t: m for t, m in sorted(mult.items()) if 0 < m < 1}
+    immune = sorted(t for t, m in mult.items() if m == 0)
+    return {"weak_to": weak, "resists": resists, "immune_to": immune}
+
+
+def team_weaknesses(members: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Attacking types that hit 2+ members super-effectively, most dangerous first. Pure.
+
+    Each entry lists who is weak, who resists and who is immune to that type.
+    """
+    attackers = sorted({t for m in members for t in m["defense"]["weak_to"]})
+    out = []
+    for t in attackers:
+        weak = [m["name"] for m in members if t in m["defense"]["weak_to"]]
+        if len(weak) < 2:
+            continue
+        resist = [m["name"] for m in members if t in m["defense"]["resists"]]
+        immune = [m["name"] for m in members if t in m["defense"]["immune_to"]]
+        out.append({"type": t, "weak": weak, "resist": resist, "immune": immune})
+    return sorted(
+        out,
+        key=lambda e: (-len(e["weak"]), len(e["resist"]) + len(e["immune"]), e["type"]),
+    )
+
+
+async def _type_relations(
+    client: Any, types: set[str]
+) -> dict[str, dict[str, Any]] | None:
+    """damage_relations of each type (Redis-cached by the client); None if any is missing."""
+    try:
+        data = await asyncio.gather(*(client.get_type_data(t) for t in sorted(types)))
+    except (
+        Exception
+    ) as e:  # noqa: BLE001 — the team analysis works without defense data
+        logger.warning("Type data unavailable for team defense", error=str(e))
+        return None
+    relations = {}
+    for t, d in zip(sorted(types), data, strict=True):
+        rel = d.get("damage_relations") if isinstance(d, dict) else None
+        if not isinstance(rel, dict):
+            return None
+        relations[t] = rel
+    return relations
+
+
 async def analyze_team(pokemon_names: list[str]) -> ToolResult:
     """Analyze a team of 2–6 Pokémon fetched in parallel.
 
@@ -872,6 +937,12 @@ async def analyze_team(pokemon_names: list[str]) -> ToolResult:
         )
         widget_members.append({**stats_entry(p), "roles": members[-1]["roles"]})
 
+    # Defense: what each member takes from every attacking type (best effort).
+    relations = await _type_relations(client, {t for m in members for t in m["types"]})
+    if relations is not None:
+        for m in members:
+            m["defense"] = defensive_profile(m["types"], relations)
+
     # Team-wide metrics
     avg_bst = sum(m["total_bst"] for m in members) / len(members)
     type_coverage = sorted({t for m in members for t in m["types"]})
@@ -917,6 +988,8 @@ async def analyze_team(pokemon_names: list[str]) -> ToolResult:
             "role_distribution": role_distribution,
         },
     }
+    if relations is not None:
+        analysis["team_analysis"]["shared_weaknesses"] = team_weaknesses(members)
 
     if not_found:
         analysis["not_found"] = not_found

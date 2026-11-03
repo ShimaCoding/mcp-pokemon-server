@@ -263,8 +263,10 @@ async def get_type_effectiveness(attacking_type: str) -> CallToolResult:
         f"parallel (a team holds at most {TEAM_MAX_SIZE}). To compare more "
         "Pokémon by stats, use compare_pokemon.\n\n"
         "Returns a JSON object with per-member data (types, base stats, BST, "
-        "battle roles) plus team-wide metrics: average BST, type coverage, "
-        "fastest/strongest/bulkiest members, and role distribution."
+        "battle roles, and defense: weak_to with 2x/4x multipliers, resists, "
+        "immune_to) plus team-wide metrics: average BST, type coverage, "
+        "fastest/strongest/bulkiest members, role distribution, and "
+        "shared_weaknesses (attacking types that hit 2+ members super-effectively)."
     ),
 )
 async def analyze_team(pokemon_names: TeamNames) -> CallToolResult:
