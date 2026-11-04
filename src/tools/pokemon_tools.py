@@ -365,6 +365,36 @@ def _collect_texts(entries: list[dict], lang: str, max_count: int = 3) -> list[s
     return result
 
 
+def ability_text(data: Any, lang: str = "es") -> dict[str, str]:
+    """``name_<lang>`` and ``description`` (latest game text) of an ability. Pure.
+
+    Empty when *data* is not an ability payload or has nothing in *lang*.
+    """
+    if not isinstance(data, dict):
+        return {}
+    out: dict[str, str] = {}
+    for entry in data.get("names") or []:
+        if entry.get("language", {}).get("name") == lang and entry.get("name"):
+            out[f"name_{lang}"] = str(entry["name"])
+            break
+    texts = [
+        e
+        for e in data.get("flavor_text_entries") or []
+        if e.get("language", {}).get("name") == lang and e.get("flavor_text")
+    ]
+    if texts:
+        out["description"] = " ".join(str(texts[-1]["flavor_text"]).split())
+    return out
+
+
+async def _ability_texts(client: Any, names: list[str]) -> list[dict[str, str]]:
+    """Spanish name and description of each ability; empty dicts where PokéAPI fails."""
+    results = await asyncio.gather(
+        *(client.get_ability(n) for n in names), return_exceptions=True
+    )
+    return [ability_text(r) for r in results]
+
+
 def _get_genus(genera: list[dict], lang: str) -> str:
     """Return the Pokémon classification string for *lang* (e.g. 'Mouse Pokémon')."""
     for entry in genera:
@@ -587,11 +617,18 @@ async def get_pokedex_entry(name_or_id: str) -> ToolResult:
     # Base stats as a plain dict
     base_stats = {s.stat["name"]: s.base_stat for s in pokemon.stats}
 
-    # Abilities ordered by slot
-    abilities = [
+    # Abilities ordered by slot, with their Spanish name and game description
+    # so the narrator does not translate or describe them from memory.
+    abilities: list[dict[str, Any]] = [
         {"name": a.ability["name"], "is_hidden": a.is_hidden}
         for a in sorted(pokemon.abilities, key=lambda x: x.slot)
     ]
+    for ability, text in zip(
+        abilities,
+        await _ability_texts(client, [a["name"] for a in abilities]),
+        strict=True,
+    ):
+        ability.update(text)
 
     # Flavor texts: prefer Spanish, fall back to English; deduplicated; max 3
     flavor_entries = species.flavor_text_entries or []
@@ -638,6 +675,10 @@ async def get_pokedex_entry(name_or_id: str) -> ToolResult:
         "egg_groups": [g["name"] for g in species.egg_groups],
         "evolution_chain": evolution_stages,
     }
+    # Same damage multipliers as analyze_team, so weaknesses are never guessed.
+    relations = await _type_relations(client, set(types))
+    if relations is not None:
+        entry["defense"] = defensive_profile(types, relations)
 
     card = {
         **pokemon_card(pokemon),

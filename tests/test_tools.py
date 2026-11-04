@@ -745,6 +745,7 @@ RELATIONS = {
         double=("ground", "rock", "water"),
         half=("bug", "steel", "fire", "grass", "ice", "fairy"),
     ),
+    "electric": _rel(double=("ground",), half=("electric", "flying", "steel")),
 }
 
 
@@ -835,3 +836,89 @@ async def test_analyze_team_without_type_data_still_works():
     data = json.loads(result.content[0]["text"])
     assert "defense" not in data["members"][0]
     assert "shared_weaknesses" not in data["team_analysis"]
+
+
+# get_pokedex_entry: Spanish ability texts and defense (#42 of pokemon-agent)
+
+from src.tools.pokemon_tools import ability_text  # noqa: E402
+
+STATIC_ABILITY = {
+    "name": "static",
+    "names": [
+        {"language": {"name": "en"}, "name": "Static"},
+        {"language": {"name": "es"}, "name": "Elec. Estática"},
+    ],
+    "flavor_text_entries": [
+        {"language": {"name": "es"}, "flavor_text": "Texto viejo."},
+        {"language": {"name": "en"}, "flavor_text": "May paralyze on contact."},
+        {
+            "language": {"name": "es"},
+            "flavor_text": "Puede paralizar al\nmínimo contacto.",
+        },
+    ],
+}
+
+
+def test_ability_text_spanish_name_and_latest_description():
+    assert ability_text(STATIC_ABILITY) == {
+        "name_es": "Elec. Estática",
+        "description": "Puede paralizar al mínimo contacto.",
+    }
+
+
+def test_ability_text_without_spanish_or_payload():
+    assert ability_text({"names": [{"language": {"name": "en"}, "name": "X"}]}) == {}
+    assert ability_text(None) == {}
+
+
+@pytest.mark.asyncio
+async def test_get_pokedex_entry_abilities_and_defense(
+    sample_pokemon_with_species, sample_species
+):
+    import json
+
+    async def type_data(name):
+        return {"name": name, "damage_relations": RELATIONS[name]}
+
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        api = AsyncMock()
+        api.get_pokemon.return_value = sample_pokemon_with_species
+        api.get_pokemon_species.return_value = sample_species
+        api.get_evolution_chain = AsyncMock(side_effect=Exception("timeout"))
+        api.get_ability = AsyncMock(return_value=STATIC_ABILITY)
+        api.get_type_data = AsyncMock(side_effect=type_data)
+        mock_client.return_value = api
+
+        data = json.loads((await get_pokedex_entry("pikachu")).content[0]["text"])
+
+    assert data["abilities"][0] == {
+        "name": "static",
+        "is_hidden": False,
+        "name_es": "Elec. Estática",
+        "description": "Puede paralizar al mínimo contacto.",
+    }
+    assert data["defense"] == defensive_profile(["electric"], RELATIONS)
+
+
+@pytest.mark.asyncio
+async def test_get_pokedex_entry_without_ability_or_type_data(
+    sample_pokemon_with_species, sample_species
+):
+    """PokéAPI failures on abilities or types leave the bare entry, never an error."""
+    import json
+
+    with patch("src.tools.pokemon_tools.get_pokemon_client") as mock_client:
+        api = AsyncMock()
+        api.get_pokemon.return_value = sample_pokemon_with_species
+        api.get_pokemon_species.return_value = sample_species
+        api.get_evolution_chain = AsyncMock(side_effect=Exception("timeout"))
+        api.get_ability = AsyncMock(side_effect=RuntimeError("pokeapi down"))
+        api.get_type_data = AsyncMock(side_effect=RuntimeError("pokeapi down"))
+        mock_client.return_value = api
+
+        result = await get_pokedex_entry("pikachu")
+
+    assert not result.is_error
+    data = json.loads(result.content[0]["text"])
+    assert data["abilities"][0] == {"name": "static", "is_hidden": False}
+    assert "defense" not in data
