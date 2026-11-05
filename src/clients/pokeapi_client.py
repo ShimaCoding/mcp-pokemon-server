@@ -219,6 +219,18 @@ class PokemonAPIClient:
         """Alias for get_type_info for consistency with resource manager."""
         return await self.get_type_info(type_name)
 
+    @cached(ttl=86400, key_prefix="ability")
+    async def get_ability(self, name: str) -> dict[str, Any]:
+        """Get an ability (localized names, effects and game descriptions)."""
+        logger.info("[POKEAPI] Fetching ability", ability=name)
+        try:
+            data = await self._make_request(f"ability/{name.lower()}")
+            logger.info("[POKEAPI] Ability ready", ability=name)
+            return data
+        except Exception as e:
+            logger.error("Failed to fetch ability", ability=name, error=str(e))
+            raise
+
     @cached(ttl=86400, key_prefix="evolution")
     async def get_evolution_chain(self, url_or_id: str) -> dict[str, Any]:
         """Get evolution chain by ID or full URL."""

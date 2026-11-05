@@ -128,10 +128,11 @@ async def analyze_pokemon_stats(name_or_id: str) -> CallToolResult:
 async def get_pokedex_entry(pokemon: str) -> CallToolResult:
     """Get a complete Pokédex entry for a Pokémon, including flavor texts.
 
-    Returns a JSON object with types, base stats, abilities, height, weight,
-    flavor text descriptions (Spanish preferred, English fallback), generation,
-    habitat, legendary/mythical status, and capture rate. Ideal for narration
-    by the Dexter persona.
+    Returns a JSON object with types, base stats, abilities (with Spanish name
+    and in-game description when PokéAPI has them), height, weight, flavor text
+    descriptions (Spanish preferred, English fallback), generation, habitat,
+    legendary/mythical status, capture rate, and defense: weak_to with 2x/4x
+    multipliers, resists and immune_to. Ideal for narration by the Dexter persona.
 
     Args:
         pokemon: Pokémon name (e.g. 'pikachu') or Pokédex number (e.g. '25').
